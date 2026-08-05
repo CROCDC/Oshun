@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Framework theme so no Material Components dependency is required; the UI is Compose. -->
+    <style name="Theme.Oshun" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

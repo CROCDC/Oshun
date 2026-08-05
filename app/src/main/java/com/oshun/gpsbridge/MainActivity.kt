@@ -36,6 +36,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.oshun.gpsbridge.core.BridgeConfig
+import com.oshun.gpsbridge.core.BridgeState
+import com.oshun.gpsbridge.core.BridgeStatus
 import com.oshun.gpsbridge.service.GpsBridgeService
 
 class MainActivity : ComponentActivity() {

@@ -41,19 +41,25 @@ La app puede emitir por los dos a la vez; después probás cuál te funciona mej
 ```
 app/
   src/main/java/com/oshun/gpsbridge/
-    model/Fix.kt              modelo de posición, sin dependencias de plataforma
-    nmea/NmeaFormatter.kt     genera NMEA 0183 + checksum (pura, testeable)
-    net/NmeaTransport.kt      interfaz común de transporte
-    net/NmeaTcpServer.kt      servidor TCP
-    net/NmeaUdpBroadcaster.kt broadcast UDP
-    net/NetworkUtils.kt       IP local para mostrar en la UI
-    location/LocationSource.kt FusedLocationProvider → Fix (Flow)
-    service/GpsBridgeService.kt foreground service (funciona con pantalla apagada)
-    BridgeState.kt            config + estado observable por la UI
-    MainActivity.kt           UI (Jetpack Compose)
-  src/test/java/.../NmeaFormatterTest.kt  tests del core NMEA
-verify/                       proyecto JVM para correr los tests NMEA sin Android SDK
+    model/Fix.kt               modelo de posición, sin dependencias de plataforma
+    nmea/NmeaFormatter.kt      genera NMEA 0183 + checksum (puro, testeable)
+    net/NmeaTransport.kt       interfaz común de transporte
+    net/NmeaTcpServer.kt       servidor TCP
+    net/NmeaUdpBroadcaster.kt  broadcast UDP
+    net/NetworkUtils.kt        IP local para mostrar en la UI
+    core/BridgeState.kt        config + estado observable por la UI
+    core/BridgeLogic.kt        lógica pura del service (transportes, texto, sentencias)
+    location/LocationSource.kt FusedLocationProvider → Fix (Flow) [Android]
+    service/GpsBridgeService.kt foreground service, pantalla apagada [Android]
+    MainActivity.kt            UI (Jetpack Compose) [Android]
+  src/test/java/com/oshun/gpsbridge/
+    model/ nmea/ net/ core/    tests unitarios del core (JUnit)
+verify/                        proyecto JVM que corre esos tests + cobertura sin Android SDK
 ```
+
+Los paquetes `[Android]` son glue de ciclo de vida / UI; toda la lógica de trabajo
+vive en `model/`, `nmea/`, `net/` y `core/`, que son Kotlin puro y están cubiertos
+por tests.
 
 ## Descargar el APK ya compilado
 
@@ -74,14 +80,20 @@ Requiere el Android SDK (compileSdk 35). Con Android Studio: abrir la carpeta y
 ./gradlew test                 # tests unitarios del core NMEA
 ```
 
-### Verificar el core NMEA sin Android SDK
+### Tests y cobertura (sin Android SDK)
 
-El módulo `verify/` compila los mismos archivos `model/` y `nmea/` en un build JVM
-puro, para correr los tests sin el Android SDK:
+El módulo `verify/` compila los mismos archivos de `model/`, `nmea/`, `net/` y
+`core/` en un build JVM puro, corre los tests JUnit y aplica un **gate de
+cobertura del 90%** (JaCoCo):
 
 ```bash
-cd verify && gradle test
+cd verify && gradle test jacocoTestCoverageVerification
+# reporte HTML: verify/build/reports/jacoco/test/html/index.html
 ```
+
+Cobertura actual del core (instrucciones): **98%** — el gate falla el build si baja
+del 90%. En CI se corre en cada push y el reporte HTML queda como artifact
+`coverage-report`.
 
 ## Permisos
 
@@ -92,7 +104,9 @@ cd verify && gradle test
 ## Estado
 
 - [x] Core NMEA (RMC/GGA + checksum) con tests que pasan
-- [x] Transportes TCP y UDP
+- [x] Transportes TCP y UDP con tests (sockets reales en loopback)
+- [x] Cobertura del core 98% con gate del 90% en CI
 - [x] Foreground service + UI
+- [x] CI que compila el APK y lo publica como artifact
 - [ ] Prueba de campo real contra Navionics (pendiente de hardware)
 - [ ] Fuente iOS (fase 2)

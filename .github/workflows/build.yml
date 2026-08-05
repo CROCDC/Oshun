@@ -31,7 +31,18 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Run NMEA unit tests
+      - name: Core tests + 90% coverage gate
+        run: ./gradlew -p verify test jacocoTestCoverageVerification --stacktrace
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: verify/build/reports/jacoco/test/html
+          if-no-files-found: warn
+
+      - name: Run app unit tests
         run: ./gradlew :app:testDebugUnitTest --stacktrace
 
       - name: Build debug APK

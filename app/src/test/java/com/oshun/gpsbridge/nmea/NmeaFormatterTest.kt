@@ -86,6 +86,21 @@ class NmeaFormatterTest {
     }
 
     @Test
+    fun minutesRoundingUpCarriesIntoDegrees() {
+        // 12.99999999° -> minutes computes to ~59.9999994, which must carry to 13°00.0000'.
+        val s = NmeaFormatter.rmc(fix.copy(latitude = 12.99999999))
+        assertTrue("carry to 13 degrees: $s", s.contains("1300.0000,N,"))
+    }
+
+    @Test
+    fun sentencesReturnsBothRmcAndGga() {
+        val list = NmeaFormatter.sentences(fix)
+        assertEquals(2, list.size)
+        assertTrue(list[0].startsWith("\$GPRMC,"))
+        assertTrue(list[1].startsWith("\$GPGGA,"))
+    }
+
+    @Test
     fun checksumMatchesKnownValue() {
         // Independent hand-verifiable case: XOR of "GPRMC" characters only.
         // G=0x47 P=0x50 R=0x52 M=0x4D C=0x43  -> 0x47^0x50=0x17 ^0x52=0x45 ^0x4D=0x08 ^0x43=0x4B

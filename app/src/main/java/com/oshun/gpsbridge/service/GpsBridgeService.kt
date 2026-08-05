@@ -11,16 +11,15 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.oshun.gpsbridge.BridgeConfig
-import com.oshun.gpsbridge.BridgeState
 import com.oshun.gpsbridge.MainActivity
 import com.oshun.gpsbridge.R
+import com.oshun.gpsbridge.core.BridgeConfig
+import com.oshun.gpsbridge.core.BridgeLogic
+import com.oshun.gpsbridge.core.BridgeState
 import com.oshun.gpsbridge.location.LocationSource
 import com.oshun.gpsbridge.net.NetworkUtils
 import com.oshun.gpsbridge.net.NmeaTcpServer
 import com.oshun.gpsbridge.net.NmeaTransport
-import com.oshun.gpsbridge.net.NmeaUdpBroadcaster
-import com.oshun.gpsbridge.nmea.NmeaFormatter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -67,16 +66,12 @@ class GpsBridgeService : Service() {
         startForegroundCompat()
 
         transports.clear()
-        if (config.tcpEnabled) {
-            transports += NmeaTcpServer(config.port).also { tcp ->
-                tcp.onClientsChanged = { count ->
-                    BridgeState.update { it.copy(tcpClients = count) }
-                    updateNotification()
-                }
+        transports += BridgeLogic.buildTransports(config)
+        transports.filterIsInstance<NmeaTcpServer>().forEach { tcp ->
+            tcp.onClientsChanged = { count ->
+                BridgeState.update { it.copy(tcpClients = count) }
+                updateNotification()
             }
-        }
-        if (config.udpEnabled) {
-            transports += NmeaUdpBroadcaster(config.port)
         }
         transports.forEach {
             try {
@@ -103,7 +98,7 @@ class GpsBridgeService : Service() {
         collectJob = scope.launch {
             source.fixes(config.intervalMillis)
                 .onEach { fix ->
-                    val lines = NmeaFormatter.sentences(fix)
+                    val lines = BridgeLogic.sentencesFor(fix)
                     transports.forEach { it.broadcast(lines) }
                     sent += lines.size
                     BridgeState.update { it.copy(lastFix = fix, sentencesSent = sent) }
@@ -163,12 +158,7 @@ class GpsBridgeService : Service() {
             Intent(this, GpsBridgeService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val protocols = buildList {
-            if (status.tcpEnabled) add("TCP")
-            if (status.udpEnabled) add("UDP")
-        }.joinToString("/")
-        val text = "${status.ipAddress ?: "?"}:${status.port} · $protocols" +
-            if (status.tcpEnabled) " · ${status.tcpClients} cliente(s)" else ""
+        val text = BridgeLogic.notificationText(status)
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Oshun GPS Bridge activo")

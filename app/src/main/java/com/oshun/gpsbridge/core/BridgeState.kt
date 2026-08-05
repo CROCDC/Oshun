@@ -1,4 +1,4 @@
-package com.oshun.gpsbridge
+package com.oshun.gpsbridge.core
 
 import com.oshun.gpsbridge.model.Fix
 import kotlinx.coroutines.flow.MutableStateFlow
