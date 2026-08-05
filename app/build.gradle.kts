@@ -107,14 +107,10 @@ tasks.register<JacocoReport>("jacocoMergedReport") {
 
     sourceDirectories.setFrom(files("src/main/java"))
     classDirectories.setFrom(files(kotlinClasses, javaClasses))
+    // Match execution data wherever AGP puts it (unit .exec + instrumented .ec),
+    // across AGP versions, so the report never silently skips.
     executionData.setFrom(
-        fileTree(layout.buildDirectory) {
-            include(
-                "outputs/unit_test_code_coverage/debugUnitTest/*.exec",
-                "outputs/code_coverage/debugAndroidTest/connected/**/*.ec",
-                "jacoco/testDebugUnitTest.exec",
-            )
-        }
+        fileTree(layout.buildDirectory) { include("**/*.exec", "**/*.ec") }
     )
     reports {
         xml.required.set(true)

@@ -98,7 +98,9 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest testDebugUnitTest jacocoMergedReport --stacktrace
+          script: |
+            ./gradlew connectedDebugAndroidTest testDebugUnitTest --stacktrace
+            ./gradlew jacocoMergedReport --stacktrace
 
       - name: Coverage summary (unit + instrumented)
         if: always()
