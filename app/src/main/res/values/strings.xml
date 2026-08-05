@@ -1,4 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Oshun GPS Bridge</string>
+
+    <!-- Main screen -->
+    <string name="app_subtitle">Comparte el GPS de este teléfono con Navionics en la tablet, por Wi-Fi.</string>
+    <string name="label_port">Puerto</string>
+    <string name="switch_tcp">TCP (servidor, 1-a-1 fiable)</string>
+    <string name="switch_udp">UDP (broadcast, varios clientes)</string>
+    <string name="label_interval">Intervalo de actualización</string>
+    <string name="action_start">Iniciar transmisión</string>
+    <string name="action_stop">Detener</string>
+
+    <!-- Status card -->
+    <string name="status_title">Transmitiendo</string>
+    <string name="status_ip">IP del teléfono</string>
+    <string name="status_no_wifi">sin Wi-Fi</string>
+    <string name="status_port">Puerto</string>
+    <string name="status_protocols">Protocolos</string>
+    <string name="status_protocols_none">ninguno</string>
+    <string name="status_tcp_clients">Clientes TCP</string>
+    <string name="status_sentences">Sentencias enviadas</string>
+    <string name="status_last_position">Última posición</string>
+    <string name="status_battery">Batería</string>
+    <string name="status_draw">Consumo estimado</string>
+    <string name="status_drain">Caída de batería</string>
+
+    <!-- Instructions card -->
+    <string name="instructions_title">En la tablet (Navionics)</string>
+    <string name="instructions_body">1. Conecta la tablet a la misma red Wi-Fi que este teléfono (o al hotspot del teléfono).\n2. Navionics → Menú → Paired Devices → Add device manually.\n3. Host/IP = la IP de arriba, Port = el puerto, Protocol = TCP o UDP.\n4. Guarda: la posición del teléfono aparece en la carta.</string>
+
+    <!-- Foreground-service notification -->
+    <string name="notif_title">Oshun GPS Bridge activo</string>
+    <string name="notif_channel_name">Oshun GPS Bridge</string>
+    <string name="notif_channel_desc">Transmisión de GPS por NMEA a Navionics</string>
+    <string name="notif_protocols_none">—</string>
+    <!-- %1$s ip, %2$d port, %3$s protocols -->
+    <string name="notif_content">%1$s:%2$d · %3$s</string>
+    <!-- %1$s ip, %2$d port, %3$s protocols, %4$d tcp clients -->
+    <string name="notif_content_clients">%1$s:%2$d · %3$s · %4$d cliente(s)</string>
 </resources>

@@ -22,16 +22,12 @@ object BridgeLogic {
     /** The NMEA sentences to send for one fix. */
     fun sentencesFor(fix: Fix): List<String> = NmeaFormatter.sentences(fix)
 
-    /** Human-readable list of active protocols, e.g. ["TCP", "UDP"]. */
+    /**
+     * Active protocols as neutral tokens, e.g. ["TCP", "UDP"]. Callers localize the
+     * surrounding text; this stays free of user-facing (translatable) strings.
+     */
     fun enabledProtocols(status: BridgeStatus): List<String> = buildList {
         if (status.tcpEnabled) add("TCP")
         if (status.udpEnabled) add("UDP")
-    }
-
-    /** The text shown in the ongoing notification, e.g. "192.168.1.5:2000 · TCP/UDP · 1 cliente(s)". */
-    fun notificationText(status: BridgeStatus): String {
-        val protocols = enabledProtocols(status).joinToString("/").ifEmpty { "—" }
-        val base = "${status.ipAddress ?: "?"}:${status.port} · $protocols"
-        return if (status.tcpEnabled) "$base · ${status.tcpClients} cliente(s)" else base
     }
 }

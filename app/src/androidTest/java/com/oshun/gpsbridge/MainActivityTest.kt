@@ -63,10 +63,13 @@ class MainActivityTest {
         GpsBridgeService.stop(compose.activity)
     }
 
+    // Resolve UI copy from resources so the test code holds no localized literals.
+    private fun str(resId: Int) = compose.activity.getString(resId)
+
     @Test
     fun showsTitleAndPairingInstructions() {
-        compose.onNodeWithText("Oshun GPS Bridge").assertIsDisplayed()
-        compose.onNodeWithText("En la tablet (Navionics)").assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.app_name)).assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.instructions_title)).assertIsDisplayed()
     }
 
     @Test
@@ -82,25 +85,25 @@ class MainActivityTest {
         compose.onNodeWithTag("switch_udp").performClick()
         compose.onNodeWithTag("switch_udp").performClick()
 
-        compose.onNodeWithText("Iniciar transmisión").assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.action_start)).assertIsDisplayed()
         compose.onNodeWithTag("action_button").performClick()
 
         // Permissions are pre-granted, so the service starts and BridgeState flips running=true,
-        // which recomposes the button to "Detener" and shows the status card.
+        // which recomposes the button to the stop action and shows the status card.
         compose.waitUntil(timeoutMillis = 5_000) {
             compose.onAllNodes(hasStopButton()).fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("Detener").assertIsDisplayed()
-        compose.onNodeWithText("Transmitiendo").assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.action_stop)).assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.status_title)).assertIsDisplayed()
         // Status card fields (exercise StatusCard + KeyValue rows). These labels are
-        // unique to the status card ("Puerto" is skipped: it also labels the text field).
-        compose.onNodeWithText("IP del teléfono").assertIsDisplayed()
-        compose.onNodeWithText("Protocolos").assertIsDisplayed()
-        compose.onNodeWithText("Sentencias enviadas").assertIsDisplayed()
+        // unique to the status card (the port label also labels the text field).
+        compose.onNodeWithText(str(R.string.status_ip)).assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.status_protocols)).assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.status_sentences)).assertIsDisplayed()
 
         compose.onNodeWithTag("action_button").performClick() // stop
     }
 
     private fun hasStopButton() =
-        androidx.compose.ui.test.hasText("Detener")
+        androidx.compose.ui.test.hasText(str(R.string.action_stop))
 }

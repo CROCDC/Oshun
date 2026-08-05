@@ -118,8 +118,11 @@ denominador es `LocationSource` (wrapper de GPS real, no testeable sin hardware)
 
 - [x] Core NMEA (RMC/GGA + checksum) con tests que pasan
 - [x] Transportes TCP y UDP con tests (sockets reales en loopback)
-- [x] Cobertura del core 98% con gate del 90% en CI
+- [x] Cobertura del core 98% con gate del 90% en CI; app mergeada ~93% instrucciones / 97% líneas
 - [x] Foreground service + UI
+- [x] Intervalo de actualización del GPS configurable (0.5 / 1 / 2 / 5 s)
+- [x] Lectura de consumo de batería (nivel %, mA instantáneos, caída %/h)
+- [x] Código en inglés; todos los textos de UI en `res/values/strings.xml`
 - [x] CI que compila el APK y lo publica como artifact
 - [ ] Prueba de campo real contra Navionics (pendiente de hardware)
 - [ ] Fuente iOS (fase 2)

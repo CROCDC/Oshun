@@ -23,6 +23,9 @@ data class BridgeStatus(
     val udpEnabled: Boolean = false,
     val lastFix: Fix? = null,
     val sentencesSent: Long = 0,
+    val batteryPercent: Int? = null,
+    val currentDrawMilliAmp: Int? = null,
+    val batteryDrainPerHour: Double? = null,
 )
 
 /**

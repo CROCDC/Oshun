@@ -62,26 +62,4 @@ class BridgeLogicTest {
         assertEquals(listOf("UDP"), BridgeLogic.enabledProtocols(BridgeStatus(udpEnabled = true)))
         assertEquals(emptyList<String>(), BridgeLogic.enabledProtocols(BridgeStatus()))
     }
-
-    @Test
-    fun notificationTextWithBothAndIpShowsClients() {
-        val text = BridgeLogic.notificationText(
-            BridgeStatus(ipAddress = "192.168.1.5", port = 2000, tcpEnabled = true, udpEnabled = true, tcpClients = 2),
-        )
-        assertEquals("192.168.1.5:2000 · TCP/UDP · 2 cliente(s)", text)
-    }
-
-    @Test
-    fun notificationTextUdpOnlyWithoutIpOrClients() {
-        val text = BridgeLogic.notificationText(
-            BridgeStatus(ipAddress = null, port = 2000, tcpEnabled = false, udpEnabled = true),
-        )
-        assertEquals("?:2000 · UDP", text)
-    }
-
-    @Test
-    fun notificationTextNoProtocolsShowsDash() {
-        val text = BridgeLogic.notificationText(BridgeStatus(ipAddress = "10.0.0.1", port = 5000))
-        assertEquals("10.0.0.1:5000 · —", text)
-    }
 }

@@ -8,11 +8,14 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.BatteryManager
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import com.oshun.gpsbridge.MainActivity
 import com.oshun.gpsbridge.R
+import com.oshun.gpsbridge.core.BatteryMath
 import com.oshun.gpsbridge.core.BridgeConfig
 import com.oshun.gpsbridge.core.BridgeLogic
 import com.oshun.gpsbridge.core.BridgeState
@@ -26,8 +29,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /**
  * Foreground service that keeps reading GPS and broadcasting NMEA even with the
@@ -37,6 +43,7 @@ class GpsBridgeService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var collectJob: Job? = null
+    private var batteryJob: Job? = null
     private val transports = mutableListOf<NmeaTransport>()
     private var sent = 0L
 
@@ -106,11 +113,53 @@ class GpsBridgeService : Service() {
                 }
                 .collect { }
         }
+
+        batteryJob = scope.launch { monitorBattery() }
+    }
+
+    /** Samples battery level and instantaneous draw, publishing an estimated drain rate. */
+    private suspend fun monitorBattery() {
+        val startElapsed = SystemClock.elapsedRealtime()
+        val startPercent = readBatteryPercent()
+        while (isActive) {
+            val percent = readBatteryPercent()
+            val drainRate = if (startPercent != null && percent != null) {
+                BatteryMath.drainPercentPerHour(startPercent, percent, SystemClock.elapsedRealtime() - startElapsed)
+            } else {
+                null
+            }
+            BridgeState.update {
+                it.copy(
+                    batteryPercent = percent,
+                    currentDrawMilliAmp = readCurrentDrawMilliAmp(),
+                    batteryDrainPerHour = drainRate,
+                )
+            }
+            delay(BATTERY_SAMPLE_MILLIS)
+        }
+    }
+
+    private fun readBatteryPercent(): Int? = try {
+        val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY).takeIf { it in 0..100 }
+    } catch (e: Exception) {
+        null
+    }
+
+    /** Instantaneous draw in mA (magnitude), or null when the device doesn't report it. */
+    private fun readCurrentDrawMilliAmp(): Int? = try {
+        val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        val microAmps = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+        if (microAmps == Int.MIN_VALUE || microAmps == 0) null else abs(microAmps) / 1000
+    } catch (e: Exception) {
+        null
     }
 
     private fun stopSelfAndCleanup() {
         collectJob?.cancel()
         collectJob = null
+        batteryJob?.cancel()
+        batteryJob = null
         transports.forEach {
             try {
                 it.stop()
@@ -159,15 +208,23 @@ class GpsBridgeService : Service() {
             Intent(this, GpsBridgeService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val text = BridgeLogic.notificationText(status)
+        val protocols = BridgeLogic.enabledProtocols(status)
+            .joinToString("/")
+            .ifEmpty { getString(R.string.notif_protocols_none) }
+        val ip = status.ipAddress ?: "?"
+        val text = if (status.tcpEnabled) {
+            getString(R.string.notif_content_clients, ip, status.port, protocols, status.tcpClients)
+        } else {
+            getString(R.string.notif_content, ip, status.port, protocols)
+        }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Oshun GPS Bridge activo")
+            .setContentTitle(getString(R.string.notif_title))
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_bridge)
             .setOngoing(true)
             .setContentIntent(open)
-            .addAction(0, "Detener", stopIntent)
+            .addAction(0, getString(R.string.action_stop), stopIntent)
             .build()
     }
 
@@ -175,9 +232,9 @@ class GpsBridgeService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Oshun GPS Bridge",
+                getString(R.string.notif_channel_name),
                 NotificationManager.IMPORTANCE_LOW,
-            ).apply { description = "Transmisión de GPS por NMEA a Navionics" }
+            ).apply { description = getString(R.string.notif_channel_desc) }
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                 .createNotificationChannel(channel)
         }
@@ -186,6 +243,7 @@ class GpsBridgeService : Service() {
     companion object {
         private const val CHANNEL_ID = "gps_bridge"
         private const val NOTIF_ID = 1
+        private const val BATTERY_SAMPLE_MILLIS = 10_000L
 
         /** Overridable so tests can supply a fake GPS source instead of Play Services. */
         var fixProviderFactory: (Context) -> FixProvider = { LocationSource(it) }
