@@ -29,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
@@ -121,7 +122,7 @@ class GpsBridgeService : Service() {
     private suspend fun monitorBattery() {
         val startElapsed = SystemClock.elapsedRealtime()
         val startPercent = readBatteryPercent()
-        while (isActive) {
+        while (currentCoroutineContext().isActive) {
             val percent = readBatteryPercent()
             val drainRate = if (startPercent != null && percent != null) {
                 BatteryMath.drainPercentPerHour(startPercent, percent, SystemClock.elapsedRealtime() - startElapsed)
