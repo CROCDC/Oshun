@@ -118,6 +118,8 @@ tasks.register<JacocoReport>("jacocoMergedReport") {
     )
     reports {
         xml.required.set(true)
+        xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/merged.xml"))
         html.required.set(true)
+        html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/mergedHtml"))
     }
 }

@@ -40,6 +40,12 @@ jobs:
       - name: App unit coverage report
         run: ./gradlew :app:jacocoMergedReport --stacktrace
 
+      - name: Coverage summary
+        if: always()
+        run: |
+          python3 ci/coverage_summary.py verify/build/reports/jacoco/test/jacocoTestReport.xml "Core (unit)"
+          python3 ci/coverage_summary.py app/build/reports/jacoco/merged.xml "App (unit only)"
+
       - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -47,7 +53,7 @@ jobs:
           name: coverage-report
           path: |
             verify/build/reports/jacoco/test/html
-            app/build/reports/jacoco/jacocoMergedReport/html
+            app/build/reports/jacoco/mergedHtml
           if-no-files-found: warn
 
       - name: Build debug APK
@@ -94,10 +100,14 @@ jobs:
           disable-animations: true
           script: ./gradlew connectedDebugAndroidTest testDebugUnitTest jacocoMergedReport --stacktrace
 
+      - name: Coverage summary (unit + instrumented)
+        if: always()
+        run: python3 ci/coverage_summary.py app/build/reports/jacoco/merged.xml "App (unit + instrumented)"
+
       - name: Upload instrumented coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report-instrumented
-          path: app/build/reports/jacoco/jacocoMergedReport/html
+          path: app/build/reports/jacoco/mergedHtml
           if-no-files-found: warn
