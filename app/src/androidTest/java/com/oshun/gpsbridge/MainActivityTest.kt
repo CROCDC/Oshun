@@ -92,9 +92,9 @@ class MainActivityTest {
         }
         compose.onNodeWithText("Detener").assertIsDisplayed()
         compose.onNodeWithText("Transmitiendo").assertIsDisplayed()
-        // Status card fields (exercise StatusCard + KeyValue rows).
+        // Status card fields (exercise StatusCard + KeyValue rows). These labels are
+        // unique to the status card ("Puerto" is skipped: it also labels the text field).
         compose.onNodeWithText("IP del teléfono").assertIsDisplayed()
-        compose.onNodeWithText("Puerto").assertIsDisplayed()
         compose.onNodeWithText("Protocolos").assertIsDisplayed()
         compose.onNodeWithText("Sentencias enviadas").assertIsDisplayed()
 
