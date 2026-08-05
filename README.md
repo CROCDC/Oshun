@@ -80,20 +80,33 @@ Requiere el Android SDK (compileSdk 35). Con Android Studio: abrir la carpeta y
 ./gradlew test                 # tests unitarios del core NMEA
 ```
 
-### Tests y cobertura (sin Android SDK)
+### Tests y cobertura
 
-El módulo `verify/` compila los mismos archivos de `model/`, `nmea/`, `net/` y
-`core/` en un build JVM puro, corre los tests JUnit y aplica un **gate de
-cobertura del 90%** (JaCoCo):
+Tres niveles de test:
 
-```bash
-cd verify && gradle test jacocoTestCoverageVerification
-# reporte HTML: verify/build/reports/jacoco/test/html/index.html
-```
+1. **Core puro (JVM, sin Android SDK)** — `verify/` compila los mismos archivos de
+   `model/`, `nmea/`, `net/` y `core/` y aplica un **gate de cobertura del 90%**:
+   ```bash
+   cd verify && gradle test jacocoTestCoverageVerification
+   ```
+   Cobertura del core (instrucciones): **98%** — el gate falla el build si baja del 90%.
 
-Cobertura actual del core (instrucciones): **98%** — el gate falla el build si baja
-del 90%. En CI se corre en cada push y el reporte HTML queda como artifact
-`coverage-report`.
+2. **Unitarios de la app (Robolectric)** — `GpsBridgeServiceTest` arranca el
+   foreground service con un GPS falso y verifica el envío de NMEA por socket real:
+   ```bash
+   ./gradlew :app:testDebugUnitTest
+   ```
+
+3. **Instrumentados (emulador)** — `MainActivityTest` (Compose) corre en un emulador:
+   ```bash
+   ./gradlew connectedDebugAndroidTest
+   ```
+
+**Cobertura mergeada del módulo app** (unit + instrumentado): ~**90%+ líneas**. El
+task `jacocoMergedReport` une las dos ejecuciones. En CI, cada push imprime los
+porcentajes en el log/summary y sube los reportes HTML como artifacts
+(`coverage-report`, `coverage-report-instrumented`). El único código excluido del
+denominador es `LocationSource` (wrapper de GPS real, no testeable sin hardware).
 
 ## Permisos
 

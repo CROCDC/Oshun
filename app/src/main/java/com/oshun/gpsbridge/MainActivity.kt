@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -107,19 +108,23 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxWidth(),
         )
 
-        SwitchRow("TCP (servidor, 1-a-1 fiable)", tcpEnabled, enabled = !status.running) { tcpEnabled = it }
-        SwitchRow("UDP (broadcast, varios clientes)", udpEnabled, enabled = !status.running) { udpEnabled = it }
+        SwitchRow("TCP (servidor, 1-a-1 fiable)", "switch_tcp", tcpEnabled, enabled = !status.running) { tcpEnabled = it }
+        SwitchRow("UDP (broadcast, varios clientes)", "switch_udp", udpEnabled, enabled = !status.running) { udpEnabled = it }
 
         if (!status.running) {
             Button(
                 onClick = { permissionLauncher.launch(requiredPermissions) },
                 enabled = tcpEnabled || udpEnabled,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("action_button"),
             ) { Text("Iniciar transmisión") }
         } else {
             Button(
                 onClick = { GpsBridgeService.stop(context) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("action_button"),
             ) { Text("Detener") }
         }
 
@@ -130,14 +135,19 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun SwitchRow(label: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+private fun SwitchRow(label: String, tag: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(label, style = MaterialTheme.typography.bodyLarge)
-        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            enabled = enabled,
+            modifier = Modifier.testTag(tag),
+        )
     }
 }
 

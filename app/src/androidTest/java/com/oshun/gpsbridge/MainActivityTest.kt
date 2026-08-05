@@ -2,7 +2,9 @@ package com.oshun.gpsbridge
 
 import android.Manifest
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -68,19 +70,35 @@ class MainActivityTest {
     }
 
     @Test
-    fun startingTheBridgeSwitchesButtonToStop() {
+    fun disablingBothTransportsDisablesStart() {
+        compose.onNodeWithTag("switch_tcp").performClick() // TCP off
+        compose.onNodeWithTag("switch_udp").performClick() // UDP off
+        compose.onNodeWithTag("action_button").assertIsNotEnabled()
+    }
+
+    @Test
+    fun startingTheBridgeSwitchesButtonToStopAndShowsStatus() {
+        // Toggle UDP off then back on to exercise the switch callbacks.
+        compose.onNodeWithTag("switch_udp").performClick()
+        compose.onNodeWithTag("switch_udp").performClick()
+
         compose.onNodeWithText("Iniciar transmisión").assertIsDisplayed()
-        compose.onNodeWithText("Iniciar transmisión").performClick()
+        compose.onNodeWithTag("action_button").performClick()
 
         // Permissions are pre-granted, so the service starts and BridgeState flips running=true,
-        // which recomposes the button to "Detener".
+        // which recomposes the button to "Detener" and shows the status card.
         compose.waitUntil(timeoutMillis = 5_000) {
             compose.onAllNodes(hasStopButton()).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("Detener").assertIsDisplayed()
         compose.onNodeWithText("Transmitiendo").assertIsDisplayed()
+        // Status card fields (exercise StatusCard + KeyValue rows).
+        compose.onNodeWithText("IP del teléfono").assertIsDisplayed()
+        compose.onNodeWithText("Puerto").assertIsDisplayed()
+        compose.onNodeWithText("Protocolos").assertIsDisplayed()
+        compose.onNodeWithText("Sentencias enviadas").assertIsDisplayed()
 
-        compose.onNodeWithText("Detener").performClick()
+        compose.onNodeWithTag("action_button").performClick() // stop
     }
 
     private fun hasStopButton() =

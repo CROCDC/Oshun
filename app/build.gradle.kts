@@ -101,6 +101,9 @@ tasks.register<JacocoReport>("jacocoMergedReport") {
         "**/R.class", "**/R\$*.class", "**/BuildConfig.*", "**/Manifest*.*",
         "**/*Test*.*", "android/**/*.*", "**/*\$Lambda\$*.*", "**/*Companion*.*",
         "**/*_Factory*.*", "**/databinding/**", "**/*ComposableSingletons*.*",
+        // LocationSource is a thin Play Services / real-GPS wrapper that cannot be
+        // exercised on a JVM or a headless emulator; excluded from the denominator.
+        "**/location/LocationSource*.*",
     )
     val kotlinClasses = fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug")) { exclude(excludes) }
     val javaClasses = fileTree(layout.buildDirectory.dir("intermediates/javac/debug/classes")) { exclude(excludes) }
