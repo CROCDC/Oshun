@@ -16,12 +16,12 @@ import kotlinx.coroutines.flow.callbackFlow
  * Emits a [Fix] for every GPS update from the fused location provider. The caller
  * must hold ACCESS_FINE_LOCATION before collecting.
  */
-class LocationSource(context: Context) {
+class LocationSource(context: Context) : FixProvider {
 
     private val client = LocationServices.getFusedLocationProviderClient(context.applicationContext)
 
     @SuppressLint("MissingPermission") // permission is checked by the caller / service before collecting
-    fun fixes(intervalMillis: Long): Flow<Fix> = callbackFlow {
+    override fun fixes(intervalMillis: Long): Flow<Fix> = callbackFlow {
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMillis)
             .setMinUpdateIntervalMillis(intervalMillis)
             .build()

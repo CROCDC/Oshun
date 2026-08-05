@@ -16,6 +16,7 @@ import com.oshun.gpsbridge.R
 import com.oshun.gpsbridge.core.BridgeConfig
 import com.oshun.gpsbridge.core.BridgeLogic
 import com.oshun.gpsbridge.core.BridgeState
+import com.oshun.gpsbridge.location.FixProvider
 import com.oshun.gpsbridge.location.LocationSource
 import com.oshun.gpsbridge.net.NetworkUtils
 import com.oshun.gpsbridge.net.NmeaTcpServer
@@ -94,7 +95,7 @@ class GpsBridgeService : Service() {
         }
         updateNotification()
 
-        val source = LocationSource(this)
+        val source = fixProviderFactory(this)
         collectJob = scope.launch {
             source.fixes(config.intervalMillis)
                 .onEach { fix ->
@@ -185,6 +186,9 @@ class GpsBridgeService : Service() {
     companion object {
         private const val CHANNEL_ID = "gps_bridge"
         private const val NOTIF_ID = 1
+
+        /** Overridable so tests can supply a fake GPS source instead of Play Services. */
+        var fixProviderFactory: (Context) -> FixProvider = { LocationSource(it) }
 
         const val ACTION_STOP = "com.oshun.gpsbridge.STOP"
         const val EXTRA_PORT = "port"
