@@ -55,7 +55,15 @@ app/
 verify/                       proyecto JVM para correr los tests NMEA sin Android SDK
 ```
 
-## Build
+## Descargar el APK ya compilado
+
+No hace falta compilar nada localmente: cada push corre el workflow
+**Build APK** (GitHub Actions) y publica el `app-debug.apk` como *artifact*.
+En GitHub → pestaña **Actions** → última corrida del branch → sección
+**Artifacts** → `oshun-gps-bridge-debug`. Lo descomprimís y lo instalás en el
+teléfono (hay que permitir "instalar apps de orígenes desconocidos").
+
+## Build local
 
 Requiere el Android SDK (compileSdk 35). Con Android Studio: abrir la carpeta y
 *Run*. Por línea de comando:
