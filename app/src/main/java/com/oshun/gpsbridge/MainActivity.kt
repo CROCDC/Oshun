@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -164,6 +165,7 @@ private fun SwitchRow(label: String, tag: String, checked: Boolean, enabled: Boo
 
 private val INTERVAL_OPTIONS = listOf(500L, 1000L, 2000L, 5000L)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun IntervalSelector(selected: Long, enabled: Boolean, onSelect: (Long) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
