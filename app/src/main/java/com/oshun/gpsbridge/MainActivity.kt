@@ -1,6 +1,7 @@
 package com.oshun.gpsbridge
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -22,6 +23,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -44,6 +46,8 @@ import com.oshun.gpsbridge.core.BridgeConfig
 import com.oshun.gpsbridge.core.BridgeLogic
 import com.oshun.gpsbridge.core.BridgeState
 import com.oshun.gpsbridge.core.BridgeStatus
+import com.oshun.gpsbridge.crash.CrashActivity
+import com.oshun.gpsbridge.crash.CrashStore
 import com.oshun.gpsbridge.service.GpsBridgeService
 
 class MainActivity : ComponentActivity() {
@@ -68,6 +72,7 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
     var tcpEnabled by remember { mutableStateOf(true) }
     var udpEnabled by remember { mutableStateOf(true) }
     var intervalMillis by remember { mutableStateOf(1000L) }
+    var lastCrash by remember { mutableStateOf(CrashStore.read(context)) }
 
     val requiredPermissions = buildList {
         add(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -105,6 +110,21 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
             stringResource(R.string.app_subtitle),
             style = MaterialTheme.typography.bodyMedium,
         )
+
+        lastCrash?.let { report ->
+            CrashBanner(
+                onView = {
+                    context.startActivity(
+                        Intent(context, CrashActivity::class.java)
+                            .putExtra(CrashActivity.EXTRA_REPORT, report),
+                    )
+                },
+                onDismiss = {
+                    CrashStore.clear(context)
+                    lastCrash = null
+                },
+            )
+        }
 
         OutlinedTextField(
             value = portText,
@@ -188,6 +208,19 @@ private fun formatInterval(millis: Long): String {
     val seconds = millis / 1000.0
     val text = if (millis % 1000L == 0L) seconds.toInt().toString() else seconds.toString()
     return "$text s"
+}
+
+@Composable
+private fun CrashBanner(onView: () -> Unit, onDismiss: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.crash_banner_title), style = MaterialTheme.typography.titleMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onView) { Text(stringResource(R.string.crash_banner_view)) }
+                OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.crash_banner_dismiss)) }
+            }
+        }
+    }
 }
 
 @Composable

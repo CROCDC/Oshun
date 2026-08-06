@@ -29,6 +29,18 @@
     <string name="instructions_title">En la tablet (Navionics)</string>
     <string name="instructions_body">1. Conecta la tablet a la misma red Wi-Fi que este teléfono (o al hotspot del teléfono).\n2. Navionics → Menú → Paired Devices → Add device manually.\n3. Host/IP = la IP de arriba, Port = el puerto, Protocol = TCP o UDP.\n4. Guarda: la posición del teléfono aparece en la carta.</string>
 
+    <!-- Crash screen -->
+    <string name="crash_title">La app se cerró de forma inesperada</string>
+    <string name="crash_subtitle">Copiá o compartí este detalle y pasámelo así lo arreglamos.</string>
+    <string name="crash_copy">Copiar</string>
+    <string name="crash_share">Compartir</string>
+    <string name="crash_restart">Reiniciar app</string>
+    <string name="crash_copied">Copiado al portapapeles</string>
+    <string name="crash_none">Sin datos de crash.</string>
+    <string name="crash_banner_title">Se detectó un cierre inesperado</string>
+    <string name="crash_banner_view">Ver detalle</string>
+    <string name="crash_banner_dismiss">Descartar</string>
+
     <!-- Foreground-service notification -->
     <string name="notif_title">Oshun GPS Bridge activo</string>
     <string name="notif_channel_name">Oshun GPS Bridge</string>

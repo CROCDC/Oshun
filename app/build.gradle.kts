@@ -104,6 +104,11 @@ tasks.register<JacocoReport>("jacocoMergedReport") {
         // LocationSource is a thin Play Services / real-GPS wrapper that cannot be
         // exercised on a JVM or a headless emulator; excluded from the denominator.
         "**/location/LocationSource*.*",
+        // Crash UI/IO glue (screen, handler, file store) and the Application entry
+        // point are exercised only when the process actually crashes; the pure
+        // report formatter lives in core/ and is unit-tested.
+        "**/crash/**",
+        "**/OshunApp*.*",
     )
     val kotlinClasses = fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug")) { exclude(excludes) }
     val javaClasses = fileTree(layout.buildDirectory.dir("intermediates/javac/debug/classes")) { exclude(excludes) }
