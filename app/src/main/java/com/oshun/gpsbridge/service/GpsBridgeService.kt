@@ -82,21 +82,15 @@ class GpsBridgeService : Service() {
                 updateNotification()
             }
         }
-        transports.forEach {
-            try {
-                it.start()
-            } catch (e: Exception) {
-                // e.g. port already in use — surface as not running for that transport
-            }
-        }
 
+        // Publish enabled state immediately so the UI flips to "running".
+        sent = 0
         BridgeState.update {
             it.copy(
                 running = true,
-                ipAddress = NetworkUtils.localIpAddress(),
                 port = config.port,
-                tcpEnabled = config.tcpEnabled && transports.any { t -> t.label == "TCP" && t.isRunning },
-                udpEnabled = config.udpEnabled && transports.any { t -> t.label == "UDP" && t.isRunning },
+                tcpEnabled = config.tcpEnabled,
+                udpEnabled = config.udpEnabled,
                 tcpClients = 0,
                 sentencesSent = 0,
             )
@@ -105,6 +99,18 @@ class GpsBridgeService : Service() {
 
         val source = fixProviderFactory(this)
         collectJob = scope.launch {
+            // Bind sockets off the main thread — ServerSocket/DatagramSocket setup on
+            // the main thread throws NetworkOnMainThreadException.
+            transports.forEach {
+                try {
+                    it.start()
+                } catch (e: Exception) {
+                    // e.g. port already in use — the transport just stays inactive
+                }
+            }
+            BridgeState.update { it.copy(ipAddress = NetworkUtils.localIpAddress()) }
+            updateNotification()
+
             source.fixes(config.intervalMillis)
                 .onEach { fix ->
                     val lines = BridgeLogic.sentencesFor(fix)
