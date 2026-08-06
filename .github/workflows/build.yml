@@ -110,6 +110,8 @@ jobs:
     name: Build APK
     needs: [unit, instrumented]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -141,3 +143,15 @@ jobs:
           name: oshun-gps-bridge-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Publish APK to Releases (latest)
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: debug-latest
+          name: Oshun — APK de debug (último)
+          prerelease: true
+          body: |
+            APK de debug del último build verde (pasó unit + instrumentados).
+            Commit: ${{ github.sha }}
+          files: app/build/outputs/apk/debug/app-debug.apk

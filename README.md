@@ -6,6 +6,13 @@ la reconoce como una fuente de posición externa (igual que un gateway NMEA de b
 
 > Ver [`PLAN.md`](PLAN.md) para el diseño completo y la justificación técnica.
 
+## Descargar la app
+
+- **Último APK (recomendado):** [Releases → `debug-latest`](https://github.com/CROCDC/Oshun/releases/tag/debug-latest) → descargá `app-debug.apk`. Es público, sin login y sin descomprimir; se actualiza en cada build verde (que pasó unit + instrumentados).
+- **Todas las versiones:** [página de Releases](https://github.com/CROCDC/Oshun/releases).
+
+En el teléfono, la primera vez hay que permitir "instalar apps de orígenes desconocidos".
+
 ## Cómo funciona
 
 ```

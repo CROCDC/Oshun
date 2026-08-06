@@ -75,7 +75,9 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
 
     var portText by remember { mutableStateOf("2000") }
     var tcpEnabled by remember { mutableStateOf(true) }
-    var udpEnabled by remember { mutableStateOf(true) }
+    // UDP off by default: TCP is the tested/recommended path and lets the idle
+    // auto-off work (UDP reception is not observable). The switch stays available.
+    var udpEnabled by remember { mutableStateOf(false) }
     var intervalMillis by remember { mutableStateOf(1000L) }
     var lastCrash by remember { mutableStateOf(CrashStore.read(context)) }
 

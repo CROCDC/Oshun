@@ -76,14 +76,14 @@ class MainActivityTest {
 
     @Test
     fun disablingBothTransportsDisablesStart() {
+        // UDP starts off; turning TCP off leaves no transport enabled.
         compose.onNodeWithTag("switch_tcp").performClick() // TCP off
-        compose.onNodeWithTag("switch_udp").performClick() // UDP off
         compose.onNodeWithTag("action_button").assertIsNotEnabled()
     }
 
     @Test
     fun startingTheBridgeSwitchesButtonToStopAndShowsStatus() {
-        // Toggle UDP off then back on to exercise the switch callbacks.
+        // Toggle UDP on then back off to exercise the switch callbacks.
         compose.onNodeWithTag("switch_udp").performClick()
         compose.onNodeWithTag("switch_udp").performClick()
 
