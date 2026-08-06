@@ -34,6 +34,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 /**
@@ -45,8 +46,12 @@ class GpsBridgeService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var collectJob: Job? = null
     private var batteryJob: Job? = null
+    private var autoOffJob: Job? = null
     private val transports = mutableListOf<NmeaTransport>()
     private var sent = 0L
+
+    @Volatile
+    private var hadTcpClient = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -78,6 +83,7 @@ class GpsBridgeService : Service() {
         transports += BridgeLogic.buildTransports(config)
         transports.filterIsInstance<NmeaTcpServer>().forEach { tcp ->
             tcp.onClientsChanged = { count ->
+                if (count > 0) hadTcpClient = true
                 BridgeState.update { it.copy(tcpClients = count) }
                 updateNotification()
             }
@@ -85,6 +91,7 @@ class GpsBridgeService : Service() {
 
         // Publish enabled state immediately so the UI flips to "running".
         sent = 0
+        hadTcpClient = false
         BridgeState.update {
             it.copy(
                 running = true,
@@ -122,6 +129,18 @@ class GpsBridgeService : Service() {
         }
 
         batteryJob = scope.launch { monitorBattery() }
+
+        // Battery saver: TCP is the only transport whose reception we can detect
+        // (UDP is connectionless). If TCP is the sole transport and no client has
+        // connected after the grace period, shut down to avoid draining the battery.
+        if (config.tcpEnabled && !config.udpEnabled) {
+            autoOffJob = scope.launch {
+                delay(AUTO_OFF_MILLIS)
+                if (!hadTcpClient) {
+                    withContext(Dispatchers.Main) { stopSelfAndCleanup() }
+                }
+            }
+        }
     }
 
     /** Samples battery level and instantaneous draw, publishing an estimated drain rate. */
@@ -167,6 +186,9 @@ class GpsBridgeService : Service() {
         collectJob = null
         batteryJob?.cancel()
         batteryJob = null
+        autoOffJob?.cancel()
+        autoOffJob = null
+        hadTcpClient = false
         transports.forEach {
             try {
                 it.stop()
@@ -251,6 +273,7 @@ class GpsBridgeService : Service() {
         private const val CHANNEL_ID = "gps_bridge"
         private const val NOTIF_ID = 1
         private const val BATTERY_SAMPLE_MILLIS = 10_000L
+        private const val AUTO_OFF_MILLIS = 15 * 60 * 1000L
 
         /** Overridable so tests can supply a fake GPS source instead of Play Services. */
         var fixProviderFactory: (Context) -> FixProvider = { LocationSource(it) }
