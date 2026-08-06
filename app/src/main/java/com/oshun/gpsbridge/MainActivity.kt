@@ -1,9 +1,11 @@
 package com.oshun.gpsbridge
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -29,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,7 +51,9 @@ import com.oshun.gpsbridge.core.BridgeState
 import com.oshun.gpsbridge.core.BridgeStatus
 import com.oshun.gpsbridge.crash.CrashActivity
 import com.oshun.gpsbridge.crash.CrashStore
+import com.oshun.gpsbridge.net.NetworkUtils
 import com.oshun.gpsbridge.service.GpsBridgeService
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,6 +78,16 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
     var udpEnabled by remember { mutableStateOf(true) }
     var intervalMillis by remember { mutableStateOf(1000L) }
     var lastCrash by remember { mutableStateOf(CrashStore.read(context)) }
+
+    // No local IPv4 means neither Wi-Fi nor the hotspot is up, so the tablet can't
+    // reach us. Poll so the banner clears as soon as the user turns the hotspot on.
+    var hasNetwork by remember { mutableStateOf(NetworkUtils.localIpAddress() != null) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            hasNetwork = NetworkUtils.localIpAddress() != null
+            delay(2000)
+        }
+    }
 
     val requiredPermissions = buildList {
         add(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -126,6 +141,10 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
             )
         }
 
+        if (!hasNetwork) {
+            NoNetworkBanner(onOpenHotspot = { openHotspotSettings(context) })
+        }
+
         OutlinedTextField(
             value = portText,
             onValueChange = { portText = it.filter(Char::isDigit).take(5) },
@@ -146,7 +165,7 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
         if (!status.running) {
             Button(
                 onClick = { permissionLauncher.launch(requiredPermissions) },
-                enabled = tcpEnabled || udpEnabled,
+                enabled = (tcpEnabled || udpEnabled) && hasNetwork,
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("action_button"),
@@ -208,6 +227,33 @@ private fun formatInterval(millis: Long): String {
     val seconds = millis / 1000.0
     val text = if (millis % 1000L == 0L) seconds.toInt().toString() else seconds.toString()
     return "$text s"
+}
+
+@Composable
+private fun NoNetworkBanner(onOpenHotspot: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.net_none_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.net_none_body), style = MaterialTheme.typography.bodyMedium)
+            Button(onClick = onOpenHotspot) { Text(stringResource(R.string.net_open_hotspot)) }
+        }
+    }
+}
+
+/** Opens the tethering/hotspot settings, falling back to the wireless settings screen. */
+private fun openHotspotSettings(context: Context) {
+    val candidates = listOf(
+        Intent().setClassName("com.android.settings", "com.android.settings.TetherSettings"),
+        Intent(Settings.ACTION_WIRELESS_SETTINGS),
+    )
+    for (intent in candidates) {
+        try {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        } catch (e: Exception) {
+            // Try the next candidate.
+        }
+    }
 }
 
 @Composable

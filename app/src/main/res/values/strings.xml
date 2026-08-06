@@ -8,6 +8,9 @@
     <string name="switch_tcp">TCP (servidor, 1-a-1 fiable)</string>
     <string name="switch_udp">UDP (broadcast, varios clientes)</string>
     <string name="label_interval">Intervalo de actualización</string>
+    <string name="net_none_title">Sin red local</string>
+    <string name="net_none_body">La tablet no te va a encontrar. Prendé el hotspot del teléfono (o conectate a una Wi-Fi) para poder transmitir.</string>
+    <string name="net_open_hotspot">Abrir configuración de hotspot</string>
     <string name="action_start">Iniciar transmisión</string>
     <string name="action_stop">Detener</string>
 
