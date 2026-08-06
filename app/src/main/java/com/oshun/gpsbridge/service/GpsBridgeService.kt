@@ -51,7 +51,7 @@ class GpsBridgeService : Service() {
     private var sent = 0L
 
     @Volatile
-    private var hadTcpClient = false
+    private var autoOffEnabled = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -83,15 +83,17 @@ class GpsBridgeService : Service() {
         transports += BridgeLogic.buildTransports(config)
         transports.filterIsInstance<NmeaTcpServer>().forEach { tcp ->
             tcp.onClientsChanged = { count ->
-                if (count > 0) hadTcpClient = true
                 BridgeState.update { it.copy(tcpClients = count) }
                 updateNotification()
+                if (autoOffEnabled) {
+                    if (count > 0) cancelIdleOff() else armIdleOff()
+                }
             }
         }
 
         // Publish enabled state immediately so the UI flips to "running".
         sent = 0
-        hadTcpClient = false
+        autoOffEnabled = config.tcpEnabled && !config.udpEnabled
         BridgeState.update {
             it.copy(
                 running = true,
@@ -130,17 +132,26 @@ class GpsBridgeService : Service() {
 
         batteryJob = scope.launch { monitorBattery() }
 
-        // Battery saver: TCP is the only transport whose reception we can detect
-        // (UDP is connectionless). If TCP is the sole transport and no client has
-        // connected after the grace period, shut down to avoid draining the battery.
-        if (config.tcpEnabled && !config.udpEnabled) {
-            autoOffJob = scope.launch {
-                delay(AUTO_OFF_MILLIS)
-                if (!hadTcpClient) {
-                    withContext(Dispatchers.Main) { stopSelfAndCleanup() }
-                }
-            }
+        // Battery-saver watchdog: reception is only observable over TCP (UDP is
+        // connectionless), so this is armed only when TCP is the sole transport. It
+        // shuts the service down after AUTO_OFF_MILLIS with no connected client —
+        // both when nobody ever connects and when the last client disconnects.
+        if (autoOffEnabled) armIdleOff()
+    }
+
+    @Synchronized
+    private fun armIdleOff() {
+        autoOffJob?.cancel()
+        autoOffJob = scope.launch {
+            delay(AUTO_OFF_MILLIS)
+            withContext(Dispatchers.Main) { stopSelfAndCleanup() }
         }
+    }
+
+    @Synchronized
+    private fun cancelIdleOff() {
+        autoOffJob?.cancel()
+        autoOffJob = null
     }
 
     /** Samples battery level and instantaneous draw, publishing an estimated drain rate. */
@@ -182,13 +193,13 @@ class GpsBridgeService : Service() {
     }
 
     private fun stopSelfAndCleanup() {
+        autoOffEnabled = false
         collectJob?.cancel()
         collectJob = null
         batteryJob?.cancel()
         batteryJob = null
         autoOffJob?.cancel()
         autoOffJob = null
-        hadTcpClient = false
         transports.forEach {
             try {
                 it.stop()
