@@ -2,6 +2,7 @@ package com.oshun.gpsbridge.location
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Looper
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
@@ -44,7 +45,11 @@ class LocationSource(context: Context) : FixProvider {
             }
         }
 
-        client.requestLocationUpdates(request, callback, null)
+        // A non-null Looper is required: the collector runs on a background thread
+        // with no Looper, so passing null crashes with "invalid null looper".
+        // Deliver callbacks on the main looper; onLocationResult only does a
+        // thread-safe trySend into the channel.
+        client.requestLocationUpdates(request, callback, Looper.getMainLooper())
         awaitClose { client.removeLocationUpdates(callback) }
     }
 }
