@@ -2,27 +2,47 @@ package com.oshun.gpsbridge
 
 import android.Manifest
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
+import com.oshun.gpsbridge.core.BridgeConfig
 import com.oshun.gpsbridge.location.FixProvider
 import com.oshun.gpsbridge.model.Fix
 import com.oshun.gpsbridge.service.GpsBridgeService
+import com.oshun.gpsbridge.store.ConfigStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import org.junit.After
 import org.junit.Before
+import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class MainActivityTest {
+
+    companion object {
+        /**
+         * The screen now pre-fills from the stored config, so start each class run from the
+         * defaults instead of from whatever a previous run left behind. Runs before the
+         * activity rule launches the activity.
+         */
+        @BeforeClass
+        @JvmStatic
+        fun resetStoredConfig() {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            ConfigStore.save(context, BridgeConfig())
+            ConfigStore.saveStopReason(context, null)
+        }
+    }
 
     @get:Rule
     val permissions: GrantPermissionRule = GrantPermissionRule.grant(
@@ -103,8 +123,18 @@ class MainActivityTest {
         compose.onNodeWithText(str(R.string.status_ip)).assertExists()
         compose.onNodeWithText(str(R.string.status_protocols)).assertExists()
         compose.onNodeWithText(str(R.string.status_sentences)).assertExists()
+        // Diagnostics rows: they are what tells a stalled bridge from a healthy one.
+        compose.onNodeWithText(str(R.string.status_last_fix)).assertExists()
+        compose.onNodeWithText(str(R.string.status_last_send)).assertExists()
 
         compose.onNodeWithTag("action_button").performClick() // stop
+    }
+
+    @Test
+    fun autoOffSwitchTogglesWithoutBlockingStart() {
+        compose.onNodeWithTag("switch_autooff").performClick() // off
+        compose.onNodeWithTag("switch_autooff").performClick() // back on
+        compose.onNodeWithTag("action_button").assertIsEnabled()
     }
 
     private fun hasStopButton() =

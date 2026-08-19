@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Keeps the CPU alive while transmitting: a foreground service does not. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Lets the app offer the battery-optimization exemption that keeps it alive for long trips. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:name=".OshunApp"

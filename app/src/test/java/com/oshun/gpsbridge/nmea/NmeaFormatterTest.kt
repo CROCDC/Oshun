@@ -106,4 +106,36 @@ class NmeaFormatterTest {
         // G=0x47 P=0x50 R=0x52 M=0x4D C=0x43  -> 0x47^0x50=0x17 ^0x52=0x45 ^0x4D=0x08 ^0x43=0x4B
         assertEquals("4B", NmeaFormatter.checksum("GPRMC"))
     }
+
+    @Test
+    fun rmc_marksAStaleFixAsVoid() {
+        val sentence = NmeaFormatter.rmc(fix, valid = false)
+        val fields = sentence.substringBefore('*').split(',')
+        assertEquals("V", fields[2]) // status: A = active, V = void
+        assertTrue("checksum covers the changed status", checksumIsValid(sentence))
+        // Everything else still travels, so the consumer keeps the last known position.
+        assertEquals(NmeaFormatter.rmc(fix).split(',')[3], fields[3])
+    }
+
+    @Test
+    fun gga_marksAStaleFixAsNoFix() {
+        val sentence = NmeaFormatter.gga(fix, valid = false)
+        val fields = sentence.substringBefore('*').split(',')
+        assertEquals("0", fields[6]) // fix quality: 1 = GPS fix, 0 = invalid
+        assertTrue(checksumIsValid(sentence))
+        assertEquals("1", NmeaFormatter.gga(fix).substringBefore('*').split(',')[6])
+    }
+
+    @Test
+    fun sentences_propagateTheValidityFlagToBoth() {
+        val invalid = NmeaFormatter.sentences(fix, valid = false)
+        assertEquals(2, invalid.size)
+        assertEquals("V", invalid[0].substringBefore('*').split(',')[2])
+        assertEquals("0", invalid[1].substringBefore('*').split(',')[6])
+        invalid.forEach { assertTrue(checksumIsValid(it)) }
+
+        val valid = NmeaFormatter.sentences(fix)
+        assertEquals("A", valid[0].substringBefore('*').split(',')[2])
+        assertEquals("1", valid[1].substringBefore('*').split(',')[6])
+    }
 }

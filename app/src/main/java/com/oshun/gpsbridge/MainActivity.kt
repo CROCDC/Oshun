@@ -3,8 +3,10 @@ package com.oshun.gpsbridge
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -51,8 +53,10 @@ import com.oshun.gpsbridge.core.BridgeState
 import com.oshun.gpsbridge.core.BridgeStatus
 import com.oshun.gpsbridge.crash.CrashActivity
 import com.oshun.gpsbridge.crash.CrashStore
+import com.oshun.gpsbridge.core.StopReason
 import com.oshun.gpsbridge.net.NetworkUtils
 import com.oshun.gpsbridge.service.GpsBridgeService
+import com.oshun.gpsbridge.store.ConfigStore
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -73,21 +77,31 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val status by BridgeState.status.collectAsState()
 
-    var portText by remember { mutableStateOf("2000") }
-    var tcpEnabled by remember { mutableStateOf(true) }
+    // Start from the last configuration the user actually used, not from the defaults.
+    val saved = remember { ConfigStore.load(context) }
+    var portText by remember { mutableStateOf(saved.port.toString()) }
+    var tcpEnabled by remember { mutableStateOf(saved.tcpEnabled) }
     // UDP off by default: TCP is the tested/recommended path and lets the idle
     // auto-off work (UDP reception is not observable). The switch stays available.
-    var udpEnabled by remember { mutableStateOf(false) }
-    var intervalMillis by remember { mutableStateOf(1000L) }
+    var udpEnabled by remember { mutableStateOf(saved.udpEnabled) }
+    var intervalMillis by remember { mutableStateOf(saved.intervalMillis) }
+    var autoOffEnabled by remember { mutableStateOf(saved.autoOffEnabled) }
     var lastCrash by remember { mutableStateOf(CrashStore.read(context)) }
+    // Why the bridge stopped last time; an idle shutdown is otherwise invisible.
+    var lastStop by remember { mutableStateOf(ConfigStore.readStopReason(context)) }
 
     // No local IPv4 means neither Wi-Fi nor the hotspot is up, so the tablet can't
     // reach us. Poll so the banner clears as soon as the user turns the hotspot on.
     var hasNetwork by remember { mutableStateOf(NetworkUtils.localIpAddress() != null) }
+    // Drives the "hace N s" counters, so a stalled bridge is visible without touching anything.
+    var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    var batteryUnrestricted by remember { mutableStateOf(isIgnoringBatteryOptimizations(context)) }
     LaunchedEffect(Unit) {
         while (true) {
             hasNetwork = NetworkUtils.localIpAddress() != null
-            delay(2000)
+            nowMillis = System.currentTimeMillis()
+            batteryUnrestricted = isIgnoringBatteryOptimizations(context)
+            delay(1000)
         }
     }
 
@@ -110,6 +124,7 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
                     tcpEnabled = tcpEnabled,
                     udpEnabled = udpEnabled,
                     intervalMillis = intervalMillis,
+                    autoOffEnabled = autoOffEnabled,
                 ),
             )
         }
@@ -147,6 +162,17 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
             NoNetworkBanner(onOpenHotspot = { openHotspotSettings(context) })
         }
 
+        if (lastStop == StopReason.IDLE_TIMEOUT && !status.running) {
+            IdleStopBanner(onDismiss = {
+                ConfigStore.saveStopReason(context, null)
+                lastStop = null
+            })
+        }
+
+        if (!batteryUnrestricted) {
+            BatteryOptimizationBanner(onFix = { openBatteryOptimizationSettings(context) })
+        }
+
         OutlinedTextField(
             value = portText,
             onValueChange = { portText = it.filter(Char::isDigit).take(5) },
@@ -157,6 +183,13 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
 
         SwitchRow(stringResource(R.string.switch_tcp), "switch_tcp", tcpEnabled, enabled = !status.running) { tcpEnabled = it }
         SwitchRow(stringResource(R.string.switch_udp), "switch_udp", udpEnabled, enabled = !status.running) { udpEnabled = it }
+
+        SwitchRow(
+            stringResource(R.string.switch_autooff),
+            "switch_autooff",
+            autoOffEnabled,
+            enabled = !status.running,
+        ) { autoOffEnabled = it }
 
         IntervalSelector(
             selected = intervalMillis,
@@ -181,7 +214,7 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
             ) { Text(stringResource(R.string.action_stop)) }
         }
 
-        if (status.running) StatusCard(status)
+        if (status.running) StatusCard(status, nowMillis)
 
         InstructionsCard()
     }
@@ -258,6 +291,60 @@ private fun openHotspotSettings(context: Context) {
     }
 }
 
+/** The bridge shut itself down for lack of clients: say so, it explains a frozen chart. */
+@Composable
+private fun IdleStopBanner(onDismiss: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.idle_banner_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.idle_banner_body), style = MaterialTheme.typography.bodyMedium)
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.testTag("idle_dismiss")) {
+                Text(stringResource(R.string.idle_banner_dismiss))
+            }
+        }
+    }
+}
+
+/** Battery optimization is on: Android may freeze the app once the screen goes off. */
+@Composable
+private fun BatteryOptimizationBanner(onFix: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.battery_banner_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.battery_banner_body), style = MaterialTheme.typography.bodyMedium)
+            Button(onClick = onFix, modifier = Modifier.testTag("battery_fix")) {
+                Text(stringResource(R.string.battery_banner_action))
+            }
+        }
+    }
+}
+
+/** True when the system won't throttle us in the background (or the API isn't available). */
+private fun isIgnoringBatteryOptimizations(context: Context): Boolean = try {
+    val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    pm.isIgnoringBatteryOptimizations(context.packageName)
+} catch (e: Exception) {
+    true // never nag when we can't tell
+}
+
+/** Asks for the exemption, falling back to the system list when the direct request is blocked. */
+@Suppress("BatteryLife") // a sideloaded navigation bridge is exactly the exempt-worthy case
+private fun openBatteryOptimizationSettings(context: Context) {
+    val candidates = listOf(
+        Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+            .setData(Uri.parse("package:" + context.packageName)),
+        Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+    )
+    for (intent in candidates) {
+        try {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        } catch (e: Exception) {
+            // Try the next candidate.
+        }
+    }
+}
+
 @Composable
 private fun CrashBanner(onView: () -> Unit, onDismiss: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -272,7 +359,7 @@ private fun CrashBanner(onView: () -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun StatusCard(status: BridgeStatus) {
+private fun StatusCard(status: BridgeStatus, nowMillis: Long) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(R.string.status_title), style = MaterialTheme.typography.titleMedium)
@@ -284,8 +371,19 @@ private fun StatusCard(status: BridgeStatus) {
             KeyValue(stringResource(R.string.status_protocols), protocols)
             if (status.tcpEnabled) KeyValue(stringResource(R.string.status_tcp_clients), status.tcpClients.toString())
             KeyValue(stringResource(R.string.status_sentences), status.sentencesSent.toString())
+            KeyValue(stringResource(R.string.status_heartbeats), status.heartbeatsSent.toString())
             status.lastFix?.let { fix ->
                 KeyValue(stringResource(R.string.status_last_position), "%.5f, %.5f".format(fix.latitude, fix.longitude))
+            }
+            // The two rows that tell a stalled bridge apart from a healthy one: is the GPS
+            // still feeding us, and is anything still reaching the tablet?
+            KeyValue(stringResource(R.string.status_last_fix), ageLabel(nowMillis, status.lastFixAtMillis))
+            KeyValue(stringResource(R.string.status_last_send), ageLabel(nowMillis, status.lastSendOkAtMillis))
+            if (status.lastFix != null && !status.fixValid) {
+                Text(
+                    stringResource(R.string.status_fix_stale),
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
             status.batteryPercent?.let { KeyValue(stringResource(R.string.status_battery), "$it%") }
             status.currentDrawMilliAmp?.let { KeyValue(stringResource(R.string.status_draw), "≈ $it mA") }
@@ -294,6 +392,13 @@ private fun StatusCard(status: BridgeStatus) {
             }
         }
     }
+}
+
+/** "hace 12 s" for a known instant, "nunca" when it never happened. */
+@Composable
+private fun ageLabel(nowMillis: Long, thenMillis: Long?): String {
+    val token = BridgeLogic.ageToken(nowMillis, thenMillis) ?: return stringResource(R.string.status_never)
+    return stringResource(R.string.status_age, token)
 }
 
 @Composable
