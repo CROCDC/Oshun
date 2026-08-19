@@ -41,7 +41,7 @@
     <string name="idle_banner_body">No hubo ningún cliente TCP conectado durante 15 minutos y se apagó para ahorrar batería. Si Navionics se te quedó con una posición vieja, fue por esto: podés desactivar el apagado automático más abajo.</string>
     <string name="idle_banner_dismiss">Entendido</string>
     <string name="battery_banner_title">Optimización de batería activada</string>
-    <string name="battery_banner_body">Android puede frenar la app con la pantalla apagada. Excluila para que el envío no se corte en medio de la navegación.</string>
+    <string name="battery_banner_body">Android puede frenar la app con la pantalla apagada.</string>
     <string name="battery_banner_action">Excluir a Oshun</string>
 
     <!-- Instructions card -->

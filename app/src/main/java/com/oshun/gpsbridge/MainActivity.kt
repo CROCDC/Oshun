@@ -162,17 +162,6 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
             NoNetworkBanner(onOpenHotspot = { openHotspotSettings(context) })
         }
 
-        if (lastStop == StopReason.IDLE_TIMEOUT && !status.running) {
-            IdleStopBanner(onDismiss = {
-                ConfigStore.saveStopReason(context, null)
-                lastStop = null
-            })
-        }
-
-        if (!batteryUnrestricted) {
-            BatteryOptimizationBanner(onFix = { openBatteryOptimizationSettings(context) })
-        }
-
         OutlinedTextField(
             value = portText,
             onValueChange = { portText = it.filter(Char::isDigit).take(5) },
@@ -212,6 +201,19 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
                     .fillMaxWidth()
                     .testTag("action_button"),
             ) { Text(stringResource(R.string.action_stop)) }
+        }
+
+        // Advisory banners live below the action button: they explain and suggest, and
+        // pushing the primary action off screen to show them is the wrong trade.
+        if (lastStop == StopReason.IDLE_TIMEOUT && !status.running) {
+            IdleStopBanner(onDismiss = {
+                ConfigStore.saveStopReason(context, null)
+                lastStop = null
+            })
+        }
+
+        if (!batteryUnrestricted) {
+            BatteryOptimizationBanner(onFix = { openBatteryOptimizationSettings(context) })
         }
 
         if (status.running) StatusCard(status, nowMillis)
