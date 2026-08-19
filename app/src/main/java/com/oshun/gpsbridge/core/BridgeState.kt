@@ -15,6 +15,8 @@ data class BridgeConfig(
     val udpEnabled: Boolean = false,
     val intervalMillis: Long = 1000L,
     val autoOffEnabled: Boolean = true,
+    /** Per-fix CSV on disk. On by default: the whole point is to have it when it fails. */
+    val rawLogEnabled: Boolean = true,
 )
 
 /** Live status published by the foreground service and observed by the UI. */
@@ -35,6 +37,8 @@ data class BridgeStatus(
     val lastSendOkAtMillis: Long? = null,
     /** False once the last fix is old enough that we transmit it flagged as invalid. */
     val fixValid: Boolean = false,
+    /** What became of the last batch: delivered, sent to nobody, backed up, blind (UDP). */
+    val outcome: DeliveryOutcome? = null,
     /** Sentences emitted as heartbeat (a resend of the last fix), included in [sentencesSent]. */
     val heartbeatsSent: Long = 0,
     val batteryPercent: Int? = null,

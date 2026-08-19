@@ -4,11 +4,15 @@ import android.content.Intent
 import android.os.Looper
 import com.oshun.gpsbridge.core.BridgeConfig
 import com.oshun.gpsbridge.core.BridgeState
+import com.oshun.gpsbridge.core.DeliveryOutcome
+import com.oshun.gpsbridge.core.EventKind
+import com.oshun.gpsbridge.core.EventLog
 import com.oshun.gpsbridge.core.StopReason
 import com.oshun.gpsbridge.location.FixProvider
 import com.oshun.gpsbridge.location.LocationSource
 import com.oshun.gpsbridge.model.Fix
 import com.oshun.gpsbridge.store.ConfigStore
+import com.oshun.gpsbridge.store.TrackLogWriter
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +32,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ServiceController
 import org.robolectric.annotation.Config
 import java.io.BufferedReader
+import java.io.File
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -44,6 +49,8 @@ class GpsBridgeServiceTest {
     @Before
     fun setUp() {
         BridgeState.reset()
+        EventLog.clear()
+        TrackLogWriter.clear(RuntimeEnvironment.getApplication())
         ConfigStore.saveStopReason(RuntimeEnvironment.getApplication(), null)
     }
 
@@ -54,6 +61,9 @@ class GpsBridgeServiceTest {
         GpsBridgeService.fixProviderFactory = { LocationSource(it) }
         GpsBridgeService.autoOffMillis = defaultAutoOffMillis
         ConfigStore.saveStopReason(RuntimeEnvironment.getApplication(), null)
+        TrackLogWriter.close(null)
+        TrackLogWriter.clear(RuntimeEnvironment.getApplication())
+        EventLog.clear()
         BridgeState.reset()
     }
 
@@ -86,21 +96,46 @@ class GpsBridgeServiceTest {
         }
     }
 
-    private fun startIntent(port: Int, tcp: Boolean, udp: Boolean, autoOff: Boolean = true): Intent =
-        Intent(RuntimeEnvironment.getApplication(), GpsBridgeService::class.java).apply {
-            putExtra(GpsBridgeService.EXTRA_PORT, port)
-            putExtra(GpsBridgeService.EXTRA_TCP, tcp)
-            putExtra(GpsBridgeService.EXTRA_UDP, udp)
-            putExtra(GpsBridgeService.EXTRA_INTERVAL, 100L)
-            putExtra(GpsBridgeService.EXTRA_AUTO_OFF, autoOff)
-        }
+    private fun startIntent(
+        port: Int,
+        tcp: Boolean,
+        udp: Boolean,
+        autoOff: Boolean = true,
+        rawLog: Boolean = true,
+    ): Intent = Intent(RuntimeEnvironment.getApplication(), GpsBridgeService::class.java).apply {
+        putExtra(GpsBridgeService.EXTRA_PORT, port)
+        putExtra(GpsBridgeService.EXTRA_TCP, tcp)
+        putExtra(GpsBridgeService.EXTRA_UDP, udp)
+        putExtra(GpsBridgeService.EXTRA_INTERVAL, 100L)
+        putExtra(GpsBridgeService.EXTRA_AUTO_OFF, autoOff)
+        putExtra(GpsBridgeService.EXTRA_RAW_LOG, rawLog)
+    }
 
     private fun startService(
         port: Int,
         tcp: Boolean,
         udp: Boolean,
         autoOff: Boolean = true,
-    ): GpsBridgeService = startWith(startIntent(port, tcp, udp, autoOff))
+        rawLog: Boolean = true,
+    ): GpsBridgeService = startWith(startIntent(port, tcp, udp, autoOff, rawLog))
+
+    private fun trackFile(): File = File(File(RuntimeEnvironment.getApplication().filesDir, "logs"), "track.csv")
+
+    /** Polls the process-wide log, which several threads write to. */
+    private fun awaitEvent(kind: EventKind, outcome: DeliveryOutcome? = null) {
+        repeat(200) {
+            val hit = EventLog.events.value.any {
+                it.kind == kind && (outcome == null || it.outcome == outcome)
+            }
+            if (hit) return
+            Thread.sleep(20)
+        }
+        assertTrue(
+            "expected a $kind${outcome?.let { " ($it)" } ?: ""} event, got " +
+                EventLog.events.value.map { "${it.kind}/${it.outcome}" },
+            false,
+        )
+    }
 
     private fun startWith(intent: Intent): GpsBridgeService {
         val controller = Robolectric.buildService(GpsBridgeService::class.java, intent)
@@ -344,6 +379,49 @@ class GpsBridgeServiceTest {
         assertEquals(1, BridgeState.status.value.tcpClients)
 
         client.close()
+        stop(service)
+        awaitRunning(false)
+    }
+
+    @Test
+    fun aSessionIsRecordedAsEventsAndAsCsvRows() {
+        val port = freePort()
+        GpsBridgeService.fixProviderFactory = { fakeProvider(sampleFix) }
+
+        val service = startService(port, tcp = true, udp = false)
+        awaitEvent(EventKind.SESSION_START)
+        // Nobody is attached yet, so the honest answer is "it never left the phone".
+        awaitEvent(EventKind.DELIVERY, DeliveryOutcome.NO_CLIENT)
+
+        val client = connect(port)
+        BufferedReader(client.getInputStream().reader(Charsets.US_ASCII)).readLine()
+        awaitEvent(EventKind.CLIENT_CONNECTED)
+        awaitEvent(EventKind.DELIVERY, DeliveryOutcome.OK)
+
+        client.close()
+        stop(service)
+        awaitRunning(false)
+        awaitEvent(EventKind.SESSION_STOP)
+
+        val lines = trackFile().readLines()
+        assertTrue("csv has a header", lines.first().startsWith("utc,"))
+        assertTrue("csv has a session line", lines.any { it.startsWith("# session ") })
+        assertTrue("csv recorded a delivery", lines.any { it.endsWith(",OK") })
+        assertTrue("csv recorded the silence too", lines.any { it.endsWith(",NO_CLIENT") })
+        assertTrue("csv is closed with a reason", lines.any { it.contains("reason=USER") })
+    }
+
+    @Test
+    fun theCsvCanBeTurnedOffWithoutLosingTheEventLog() {
+        val port = freePort()
+        GpsBridgeService.fixProviderFactory = { fakeProvider(sampleFix) }
+
+        val service = startService(port, tcp = true, udp = false, rawLog = false)
+        awaitEvent(EventKind.SESSION_START)
+        awaitEvent(EventKind.DELIVERY, DeliveryOutcome.NO_CLIENT)
+
+        assertFalse("no CSV was written", trackFile().exists() && trackFile().length() > 0)
+
         stop(service)
         awaitRunning(false)
     }

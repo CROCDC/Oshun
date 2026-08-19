@@ -14,7 +14,8 @@ import kotlin.math.abs
  */
 object NmeaFormatter {
 
-    private const val MPS_TO_KNOTS = 1.943844
+    /** Public because the track log reports speed in knots from the same source of truth. */
+    const val MPS_TO_KNOTS = 1.943844
 
     /**
      * The sentences to emit for one fix. RMC is the minimum Navionics needs; GGA adds

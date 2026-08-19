@@ -5,8 +5,9 @@ package com.oshun.gpsbridge.net
  * can consume them. Two implementations exist (TCP server, UDP broadcaster) and
  * both can run at the same time — Navionics is paired to whichever one you pick.
  *
- * Pure JVM (java.net), no Android dependency. Networking must be driven off the
- * main thread by the caller.
+ * Pure JVM (java.net/java.nio), no Android dependency. Networking must be driven off
+ * the main thread by the caller, and no implementation may block the caller: a tablet
+ * that stops reading must never stall the emitter.
  */
 interface NmeaTransport {
     /** Human-readable name for the UI/logs, e.g. "TCP" or "UDP". */
@@ -21,8 +22,12 @@ interface NmeaTransport {
     /** Bind sockets / open resources. Safe to call twice. */
     fun start()
 
-    /** Push one fix worth of sentences. No-op when not running. */
-    fun broadcast(lines: List<String>)
+    /**
+     * Push one fix worth of sentences, reporting what became of them. [nowMillis] is the
+     * caller's clock, so stall timing stays testable. No-op (and [SendResult.down]) when
+     * the transport is not running.
+     */
+    fun broadcast(lines: List<String>, nowMillis: Long): SendResult
 
     /** Release all resources. Safe to call twice. */
     fun stop()

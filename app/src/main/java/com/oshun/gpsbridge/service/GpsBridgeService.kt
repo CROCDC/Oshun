@@ -21,7 +21,12 @@ import com.oshun.gpsbridge.core.BatteryMath
 import com.oshun.gpsbridge.core.BridgeConfig
 import com.oshun.gpsbridge.core.BridgeLogic
 import com.oshun.gpsbridge.core.BridgeState
+import com.oshun.gpsbridge.core.DeliveryTracker
+import com.oshun.gpsbridge.core.EventKind
+import com.oshun.gpsbridge.core.EventLog
+import com.oshun.gpsbridge.core.LogEvent
 import com.oshun.gpsbridge.core.StopReason
+import com.oshun.gpsbridge.core.TrackLogFormatter
 import com.oshun.gpsbridge.location.FixProvider
 import com.oshun.gpsbridge.location.LocationSource
 import com.oshun.gpsbridge.model.Fix
@@ -29,6 +34,7 @@ import com.oshun.gpsbridge.net.NetworkUtils
 import com.oshun.gpsbridge.net.NmeaTcpServer
 import com.oshun.gpsbridge.net.NmeaTransport
 import com.oshun.gpsbridge.store.ConfigStore
+import com.oshun.gpsbridge.store.TrackLogWriter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -61,6 +67,8 @@ class GpsBridgeService : Service() {
     private val transports = mutableListOf<NmeaTransport>()
     private var sent = 0L
     private var heartbeats = 0L
+
+    private val tracker = DeliveryTracker()
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
@@ -109,6 +117,7 @@ class GpsBridgeService : Service() {
             udpEnabled = intent.getBooleanExtra(EXTRA_UDP, false),
             intervalMillis = intent.getLongExtra(EXTRA_INTERVAL, 1000L),
             autoOffEnabled = intent.getBooleanExtra(EXTRA_AUTO_OFF, true),
+            rawLogEnabled = intent.getBooleanExtra(EXTRA_RAW_LOG, true),
         )
     }
 
@@ -133,6 +142,15 @@ class GpsBridgeService : Service() {
         transports += BridgeLogic.buildTransports(newConfig)
         transports.filterIsInstance<NmeaTcpServer>().forEach { tcp ->
             tcp.onClientsChanged = { count -> onClientsChanged(count) }
+            tcp.onClientEvent = { connected, remote ->
+                EventLog.record(
+                    LogEvent(
+                        atMillis = System.currentTimeMillis(),
+                        kind = if (connected) EventKind.CLIENT_CONNECTED else EventKind.CLIENT_DISCONNECTED,
+                        detail = remote,
+                    ),
+                )
+            }
         }
 
         // Publish enabled state immediately so the UI flips to "running".
@@ -142,6 +160,18 @@ class GpsBridgeService : Service() {
         lastFixAtMillis = 0L
         lastSentAtMillis = 0L
         lastClientCount = 0
+        tracker.reset()
+        val startedAt = System.currentTimeMillis()
+        EventLog.record(
+            LogEvent(
+                atMillis = startedAt,
+                kind = EventKind.SESSION_START,
+                detail = "${transports.joinToString("+") { it.label }}:${newConfig.port}",
+            ),
+        )
+        if (newConfig.rawLogEnabled) {
+            TrackLogWriter.open(this, TrackLogFormatter.sessionHeader(startedAt, newConfig))
+        }
         autoOffEnabled = BridgeLogic.shouldArmIdleOff(newConfig)
         BridgeState.update {
             it.copy(
@@ -157,6 +187,7 @@ class GpsBridgeService : Service() {
                 lastFixAtMillis = null,
                 lastSendOkAtMillis = null,
                 fixValid = false,
+                outcome = null,
             )
         }
         updateNotification()
@@ -216,9 +247,10 @@ class GpsBridgeService : Service() {
         val now = System.currentTimeMillis()
         val valid = !BridgeLogic.isStale(now - lastFixAtMillis, current.intervalMillis)
         val lines = BridgeLogic.sentencesFor(fix, valid)
-        val live = BridgeLogic.hasLiveConsumer(transports)
 
-        transports.forEach { it.broadcast(lines) }
+        val results = transports.map { it.broadcast(lines, now) }
+        val outcome = BridgeLogic.outcomeFor(results)
+        val delivered = BridgeLogic.leftThePhone(outcome)
 
         sent += lines.size
         if (heartbeat) heartbeats += lines.size
@@ -229,8 +261,25 @@ class GpsBridgeService : Service() {
                 sentencesSent = sent,
                 heartbeatsSent = heartbeats,
                 lastFixAtMillis = lastFixAtMillis,
-                lastSendOkAtMillis = if (live) now else it.lastSendOkAtMillis,
+                lastSendOkAtMillis = if (delivered) now else it.lastSendOkAtMillis,
                 fixValid = valid,
+                outcome = outcome,
+            )
+        }
+
+        // Only transitions reach the on-screen log; the per-fix record goes to the CSV.
+        EventLog.recordAll(tracker.onEmission(now, outcome, valid))
+        if (current.rawLogEnabled) {
+            TrackLogWriter.append(
+                this,
+                TrackLogFormatter.csvLine(
+                    nowMillis = now,
+                    fix = fix,
+                    valid = valid,
+                    outcome = outcome,
+                    transports = BridgeLogic.transportsToken(results),
+                    clients = BridgeLogic.clientTotal(results),
+                ),
             )
         }
     }
@@ -378,13 +427,19 @@ class GpsBridgeService : Service() {
 
     /** Detaches the client callback so a transport being torn down can't re-arm the watchdog. */
     private fun NmeaTransport.detachClientCallback() {
-        if (this is NmeaTcpServer) onClientsChanged = null
+        if (this is NmeaTcpServer) {
+            onClientsChanged = null
+            onClientEvent = null
+        }
     }
 
     private fun stopSelfAndCleanup(reason: StopReason) {
         // Persisted so the UI can explain the silence even after the process is gone —
         // an idle shutdown is otherwise indistinguishable from "the app died".
         ConfigStore.saveStopReason(this, reason.takeIf { it != StopReason.USER })
+        val endedAt = System.currentTimeMillis()
+        EventLog.record(LogEvent(atMillis = endedAt, kind = EventKind.SESSION_STOP, detail = reason.name))
+        TrackLogWriter.close(TrackLogFormatter.sessionFooter(endedAt, reason))
         if (reason == StopReason.IDLE_TIMEOUT) notifyAutoOff()
         stopSession()
         releaseLocks()
@@ -505,6 +560,7 @@ class GpsBridgeService : Service() {
         const val EXTRA_UDP = "udp"
         const val EXTRA_INTERVAL = "interval"
         const val EXTRA_AUTO_OFF = "autooff"
+        const val EXTRA_RAW_LOG = "rawlog"
 
         fun start(context: Context, config: BridgeConfig) {
             val intent = Intent(context, GpsBridgeService::class.java).apply {
@@ -513,6 +569,7 @@ class GpsBridgeService : Service() {
                 putExtra(EXTRA_UDP, config.udpEnabled)
                 putExtra(EXTRA_INTERVAL, config.intervalMillis)
                 putExtra(EXTRA_AUTO_OFF, config.autoOffEnabled)
+                putExtra(EXTRA_RAW_LOG, config.rawLogEnabled)
             }
             context.startForegroundService(intent)
         }

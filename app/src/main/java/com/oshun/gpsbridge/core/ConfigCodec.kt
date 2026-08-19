@@ -22,6 +22,7 @@ object ConfigCodec {
         "udp=${config.udpEnabled.token()}",
         "interval=${config.intervalMillis}",
         "autooff=${config.autoOffEnabled.token()}",
+        "rawlog=${config.rawLogEnabled.token()}",
     ).joinToString(";")
 
     fun decode(encoded: String?): BridgeConfig {
@@ -40,6 +41,7 @@ object ConfigCodec {
             udpEnabled = fields["udp"].toBooleanOr(defaults.udpEnabled),
             intervalMillis = fields["interval"]?.toLongOrNull()?.takeIf { it > 0 } ?: defaults.intervalMillis,
             autoOffEnabled = fields["autooff"].toBooleanOr(defaults.autoOffEnabled),
+            rawLogEnabled = fields["rawlog"].toBooleanOr(defaults.rawLogEnabled),
         )
         // A config with no transport can't transmit anything; fall back to TCP rather
         // than restarting into a bridge that is "running" but mute.

@@ -3,6 +3,8 @@
 build/
 verify/.gradle/
 verify/build/
+.kotlin/
+verify/.kotlin/
 
 # Android / IDE
 local.properties

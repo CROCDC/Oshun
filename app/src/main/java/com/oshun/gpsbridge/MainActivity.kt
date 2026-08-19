@@ -86,6 +86,7 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
     var udpEnabled by remember { mutableStateOf(saved.udpEnabled) }
     var intervalMillis by remember { mutableStateOf(saved.intervalMillis) }
     var autoOffEnabled by remember { mutableStateOf(saved.autoOffEnabled) }
+    var rawLogEnabled by remember { mutableStateOf(saved.rawLogEnabled) }
     var lastCrash by remember { mutableStateOf(CrashStore.read(context)) }
     // Why the bridge stopped last time; an idle shutdown is otherwise invisible.
     var lastStop by remember { mutableStateOf(ConfigStore.readStopReason(context)) }
@@ -125,6 +126,7 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
                     udpEnabled = udpEnabled,
                     intervalMillis = intervalMillis,
                     autoOffEnabled = autoOffEnabled,
+                    rawLogEnabled = rawLogEnabled,
                 ),
             )
         }
@@ -180,6 +182,13 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
             enabled = !status.running,
         ) { autoOffEnabled = it }
 
+        SwitchRow(
+            stringResource(R.string.switch_rawlog),
+            "switch_rawlog",
+            rawLogEnabled,
+            enabled = !status.running,
+        ) { rawLogEnabled = it }
+
         IntervalSelector(
             selected = intervalMillis,
             enabled = !status.running,
@@ -202,6 +211,13 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
                     .testTag("action_button"),
             ) { Text(stringResource(R.string.action_stop)) }
         }
+
+        OutlinedButton(
+            onClick = { context.startActivity(Intent(context, LogActivity::class.java)) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("open_log"),
+        ) { Text(stringResource(R.string.log_open)) }
 
         // Advisory banners live below the action button: they explain and suggest, and
         // pushing the primary action off screen to show them is the wrong trade.
@@ -372,6 +388,7 @@ private fun StatusCard(status: BridgeStatus, nowMillis: Long) {
                 .ifEmpty { stringResource(R.string.status_protocols_none) }
             KeyValue(stringResource(R.string.status_protocols), protocols)
             if (status.tcpEnabled) KeyValue(stringResource(R.string.status_tcp_clients), status.tcpClients.toString())
+            KeyValue(stringResource(R.string.status_delivery), outcomeLabel(status.outcome))
             KeyValue(stringResource(R.string.status_sentences), status.sentencesSent.toString())
             KeyValue(stringResource(R.string.status_heartbeats), status.heartbeatsSent.toString())
             status.lastFix?.let { fix ->

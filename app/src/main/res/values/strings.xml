@@ -9,6 +9,7 @@
     <string name="switch_udp">UDP (broadcast, varios clientes)</string>
     <string name="label_interval">Intervalo de actualización</string>
     <string name="switch_autooff">Apagado automático sin clientes (15 min)</string>
+    <string name="switch_rawlog">Registrar cada posición en un CSV</string>
     <string name="net_none_title">Sin red local</string>
     <string name="net_none_body">La tablet no te va a encontrar. Prendé el hotspot del teléfono (o conectate a una Wi-Fi) para poder transmitir.</string>
     <string name="net_open_hotspot">Abrir configuración de hotspot</string>
@@ -34,6 +35,17 @@
     <string name="status_never">nunca</string>
     <!-- %1$s: "12 s", "3 min 07 s", "1 h 04 min" -->
     <string name="status_age">hace %1$s</string>
+    <string name="status_delivery">Entrega</string>
+
+    <!-- Resultado de cada envío -->
+    <string name="outcome_ok">Entregado a un cliente</string>
+    <string name="outcome_no_client">Sin cliente: no salió del teléfono</string>
+    <string name="outcome_stalled">Trabado: se envía y no lo consumen</string>
+    <string name="outcome_dropped">Se cortó la conexión</string>
+    <string name="outcome_blind">UDP: salió, sin confirmación posible</string>
+    <string name="outcome_not_sent">Sin transporte activo</string>
+    <string name="outcome_unknown">todavía sin datos</string>
+
     <string name="status_fix_stale">Fix viejo: se transmite marcado como inválido (RMC \"V\").</string>
 
     <!-- Diagnostics / power banners -->
@@ -43,6 +55,28 @@
     <string name="battery_banner_title">Optimización de batería activada</string>
     <string name="battery_banner_body">Android puede frenar la app con la pantalla apagada.</string>
     <string name="battery_banner_action">Excluir a Oshun</string>
+
+    <!-- Registro -->
+    <string name="log_open">Ver registro</string>
+    <string name="log_title">Registro</string>
+    <string name="log_subtitle">Qué cambió y cuándo. El detalle posición por posición va al CSV.</string>
+    <!-- %1$s: tamaño, p. ej. "1,2 MB" -->
+    <string name="log_file_size">Archivo CSV: %1$s</string>
+    <string name="log_share">Compartir CSV</string>
+    <string name="log_clear">Borrar</string>
+    <string name="log_empty">Todavía no hay eventos. Iniciá la transmisión.</string>
+    <string name="log_share_empty">Todavía no hay nada para compartir.</string>
+    <!-- %1$s: protocolos y puerto, p. ej. "TCP:2000" -->
+    <string name="log_session_start">Sesión iniciada (%1$s)</string>
+    <!-- %1$s: motivo -->
+    <string name="log_session_stop">Sesión detenida (%1$s)</string>
+    <string name="log_stop_user">manual</string>
+    <string name="log_stop_idle">apagado automático</string>
+    <!-- %1$s: IP del cliente -->
+    <string name="log_client_connected">Cliente conectado: %1$s</string>
+    <string name="log_client_disconnected">Cliente desconectado: %1$s</string>
+    <string name="log_fix_ok">GPS al día</string>
+    <string name="log_fix_stale">Fix viejo: se transmite como inválido</string>
 
     <!-- Instructions card -->
     <string name="instructions_title">En la tablet (Navionics)</string>

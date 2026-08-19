@@ -35,14 +35,18 @@ class NmeaUdpBroadcaster(
         isRunning = true
     }
 
-    override fun broadcast(lines: List<String>) {
-        val s = socket ?: return
-        val addr = target ?: return
-        if (lines.isEmpty()) return
+    override fun broadcast(lines: List<String>, nowMillis: Long): SendResult {
+        val s = socket ?: return SendResult(label, down = true)
+        val addr = target ?: return SendResult(label, down = true)
+        if (lines.isEmpty()) return SendResult(label, blind = true)
         val bytes = lines.joinToString("").toByteArray(Charsets.US_ASCII)
-        try {
+        return try {
             s.send(DatagramPacket(bytes, bytes.size, addr, port))
-        } catch (_: Exception) {
+            // Blind by definition: UDP has no acknowledgement, so "it left the phone" is
+            // the strongest thing this transport will ever be able to tell the log.
+            SendResult(label, blind = true)
+        } catch (e: Exception) {
+            SendResult(label, dropped = 1)
         }
     }
 

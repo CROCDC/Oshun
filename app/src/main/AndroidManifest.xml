@@ -32,10 +32,26 @@
         </activity>
 
         <activity
+            android:name=".LogActivity"
+            android:exported="false"
+            android:label="@string/log_title" />
+
+        <activity
             android:name=".crash.CrashActivity"
             android:exported="false"
             android:process=":crash" />
 
+
+        <!-- Shares the exported copy of the track log without exposing app storage. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.logs"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <service
             android:name=".service.GpsBridgeService"

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- The shareable copy of the track log lives in the cache, not next to the live file. -->
+    <cache-path name="logs" path="logs/" />
+</paths>

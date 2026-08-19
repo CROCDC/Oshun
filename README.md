@@ -68,6 +68,48 @@ que cuando pase se pueda diagnosticar en 10 segundos:
 4. Prueba definitiva desde otra máquina en la misma red: `nc <ip-del-telefono> 2000`
    tiene que escupir `$GPRMC` continuamente.
 
+## Registro de posiciones
+
+La app guarda **qué mandó y qué pasó con cada envío**, que es lo que después permite
+distinguir "se cortó el GPS" de "se cortó la red" de "mandé y la tablet no lo consumía".
+
+En **Ver registro** (botón debajo de Iniciar) ves los *eventos*: solo los momentos en que
+algo cambió — sesión iniciada, cliente conectado con su IP, entrega trabada, fix viejo,
+apagado automático. Un log que repite "OK" una vez por segundo no se lee; lo que importa
+es *cuándo* cambió algo.
+
+En paralelo, con el switch **Registrar cada posición en un CSV** (encendido por defecto),
+cada emisión se escribe en un CSV rotativo que sobrevive a que el sistema mate el proceso:
+
+```
+utc,lat,lon,sog_kn,cog_deg,fix,sats,transports,clients,outcome
+2026-08-19T21:00:00Z,-34.601234,-58.381234,10.0,84.4,A,8,TCP,1,OK
+```
+
+Se comparte desde la misma pantalla (**Compartir CSV**), que arma un archivo único con el
+histórico completo.
+
+### Qué puede y qué no puede saber el puente
+
+TCP **no** confirma que Navionics haya leído ni interpretado una sentencia: no existe
+acuse de recibo a nivel de aplicación. Lo que sí sabemos, y queda en la columna
+`outcome`, es:
+
+| Estado | Qué significa |
+|---|---|
+| `OK` | Había un cliente y se llevó el lote completo: lo más cerca de "entregado" que llega TCP |
+| `NO_CLIENT` | Nadie conectado: las sentencias no salieron del teléfono |
+| `STALLED` | El buffer del socket se llena: escribimos y del otro lado **no lo consumen** |
+| `DROPPED` | La conexión se cortó durante el envío |
+| `BLIND` | Salió por UDP: sin confirmación posible, por diseño del protocolo |
+| `NOT_SENT` | Ningún transporte activo (por ejemplo, el puerto estaba ocupado) |
+
+`STALLED` es el que responde tu pregunta original: el socket sigue abierto, la app cree
+que hay un cliente, y sin embargo la carta está congelada. Se detecta porque los sockets
+son **no bloqueantes**: una escritura informa cuántos bytes aceptó la ventana del peer, y
+una escritura parcial significa que la tablet dejó de leer. Con IO bloqueante eso era
+invisible: el `write` simplemente esperaba.
+
 ## Estructura
 
 ```
@@ -83,7 +125,13 @@ app/
     core/BridgeLogic.kt        lógica pura del service (transportes, heartbeat, staleness, edades)
     core/ConfigCodec.kt        serializa la config para que sobreviva un reinicio del servicio
     core/StopReason.kt         por qué se detuvo el puente (usuario / apagado por inactividad)
+    core/DeliveryOutcome.kt    qué pasó con cada envío (entregado / sin cliente / trabado / ciego)
+    core/DeliveryTracker.kt    convierte el flujo de envíos en los pocos eventos que importan
+    core/EventLog.kt           historial acotado de eventos, observable por la pantalla de registro
+    core/TrackLogFormatter.kt  arma el CSV de la bitácora (puro, testeado línea por línea)
     store/ConfigStore.kt       persistencia (SharedPreferences) de config y último motivo de apagado [Android]
+    store/TrackLogWriter.kt    CSV rotativo en disco + copia compartible [Android]
+    LogActivity.kt             pantalla de registro (Jetpack Compose) [Android]
     location/LocationSource.kt FusedLocationProvider → Fix (Flow) [Android]
     service/GpsBridgeService.kt foreground service, pantalla apagada [Android]
     MainActivity.kt            UI (Jetpack Compose) [Android]
@@ -165,6 +213,8 @@ de batería, opcional: solo se usa cuando tocás el botón del banner).
 - [x] Wake lock + Wi-Fi lock, heartbeat de reenvío y detección de cliente TCP muerto
 - [x] Config persistida entre reinicios del servicio + apagado automático configurable
 - [x] Diagnóstico en pantalla: edad del último fix, del último envío y motivo del último apagado
+- [x] Registro de sesión en la app + CSV rotativo de cada posición, con el resultado de cada envío
+- [x] Sockets no bloqueantes: se distingue "no había nadie" de "mandé y no lo consumieron"
 - [x] Código en inglés; todos los textos de UI en `res/values/strings.xml`
 - [x] CI que compila el APK y lo publica como artifact
 - [ ] Prueba de campo real contra Navionics (pendiente de hardware)
