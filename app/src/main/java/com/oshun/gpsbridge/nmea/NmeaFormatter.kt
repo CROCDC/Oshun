@@ -16,30 +16,40 @@ object NmeaFormatter {
 
     private const val MPS_TO_KNOTS = 1.943844
 
-    /** The sentences to emit for one fix. RMC is the minimum Navionics needs; GGA adds fix quality/altitude. */
-    fun sentences(fix: Fix): List<String> = listOf(rmc(fix), gga(fix))
+    /**
+     * The sentences to emit for one fix. RMC is the minimum Navionics needs; GGA adds
+     * fix quality/altitude.
+     *
+     * [valid] is false when the fix is stale (the GPS stopped delivering and we are only
+     * keeping the link alive). The sentences then carry RMC status `V` and GGA quality `0`,
+     * which is how a real NMEA source says "this position is no longer trustworthy" —
+     * without it the consumer silently keeps drawing the last position as if it were live.
+     */
+    fun sentences(fix: Fix, valid: Boolean = true): List<String> = listOf(rmc(fix, valid), gga(fix, valid))
 
     /** $GPRMC — recommended minimum: time, position, speed (knots), course, date. */
-    fun rmc(fix: Fix): String {
+    fun rmc(fix: Fix, valid: Boolean = true): String {
         val c = utc(fix.timeUtcMillis)
         val lat = latitude(fix.latitude)
         val lon = longitude(fix.longitude)
         val sog = String.format(Locale.US, "%.1f", fix.speedMetersPerSecond * MPS_TO_KNOTS)
         val cog = String.format(Locale.US, "%.1f", normalizeBearing(fix.bearingDegrees))
-        val body = "GPRMC,${hms(c)},A,${lat.value},${lat.hemi},${lon.value},${lon.hemi}," +
+        val status = if (valid) 'A' else 'V'
+        val body = "GPRMC,${hms(c)},$status,${lat.value},${lat.hemi},${lon.value},${lon.hemi}," +
             "$sog,$cog,${dmy(c)},,"
         return frame(body)
     }
 
     /** $GPGGA — fix quality, satellites, altitude. */
-    fun gga(fix: Fix): String {
+    fun gga(fix: Fix, valid: Boolean = true): String {
         val c = utc(fix.timeUtcMillis)
         val lat = latitude(fix.latitude)
         val lon = longitude(fix.longitude)
         val sats = if (fix.satellites >= 0) String.format(Locale.US, "%02d", fix.satellites) else ""
         val alt = String.format(Locale.US, "%.1f", fix.altitudeMeters)
+        val quality = if (valid) 1 else 0
         val body = "GPGGA,${hms(c)},${lat.value},${lat.hemi},${lon.value},${lon.hemi}," +
-            "1,$sats,1.0,$alt,M,0.0,M,,"
+            "$quality,$sats,1.0,$alt,M,0.0,M,,"
         return frame(body)
     }
 

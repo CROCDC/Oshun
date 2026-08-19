@@ -8,9 +8,11 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import com.oshun.gpsbridge.MainActivity
@@ -19,11 +21,14 @@ import com.oshun.gpsbridge.core.BatteryMath
 import com.oshun.gpsbridge.core.BridgeConfig
 import com.oshun.gpsbridge.core.BridgeLogic
 import com.oshun.gpsbridge.core.BridgeState
+import com.oshun.gpsbridge.core.StopReason
 import com.oshun.gpsbridge.location.FixProvider
 import com.oshun.gpsbridge.location.LocationSource
+import com.oshun.gpsbridge.model.Fix
 import com.oshun.gpsbridge.net.NetworkUtils
 import com.oshun.gpsbridge.net.NmeaTcpServer
 import com.oshun.gpsbridge.net.NmeaTransport
+import com.oshun.gpsbridge.store.ConfigStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -40,15 +45,40 @@ import kotlin.math.abs
 /**
  * Foreground service that keeps reading GPS and broadcasting NMEA even with the
  * screen off. Started from the UI with a [BridgeConfig] in the intent extras.
+ *
+ * Being a foreground service only stops the process from being killed — it does not
+ * keep the CPU or the Wi-Fi radio awake, so the service also holds a partial wake lock
+ * and a Wi-Fi lock while transmitting, and re-sends the last fix on a heartbeat so the
+ * link never goes silent while the bridge is up.
  */
 class GpsBridgeService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var collectJob: Job? = null
+    private var heartbeatJob: Job? = null
     private var batteryJob: Job? = null
     private var autoOffJob: Job? = null
     private val transports = mutableListOf<NmeaTransport>()
     private var sent = 0L
+    private var heartbeats = 0L
+
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
+
+    @Volatile
+    private var config: BridgeConfig? = null
+
+    @Volatile
+    private var lastFix: Fix? = null
+
+    @Volatile
+    private var lastFixAtMillis = 0L
+
+    @Volatile
+    private var lastSentAtMillis = 0L
+
+    @Volatile
+    private var lastClientCount = 0
 
     @Volatile
     private var autoOffEnabled = false
@@ -58,50 +88,75 @@ class GpsBridgeService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
-                stopSelfAndCleanup()
+                stopSelfAndCleanup(StopReason.USER)
                 return START_NOT_STICKY
             }
-            else -> start(intent)
+            else -> start(configFrom(intent))
         }
         return START_STICKY
     }
 
-    private fun start(intent: Intent?) {
-        if (collectJob != null) return // already running
-
-        val config = BridgeConfig(
-            port = intent?.getIntExtra(EXTRA_PORT, 2000) ?: 2000,
-            tcpEnabled = intent?.getBooleanExtra(EXTRA_TCP, true) ?: true,
-            udpEnabled = intent?.getBooleanExtra(EXTRA_UDP, true) ?: true,
-            intervalMillis = intent?.getLongExtra(EXTRA_INTERVAL, 1000L) ?: 1000L,
+    /**
+     * The config to run with. A restart by the system (START_STICKY) redelivers a null
+     * intent, and an intent without extras carries nothing either — in both cases the
+     * stored config is what the user actually chose, so it beats the hardcoded defaults.
+     */
+    private fun configFrom(intent: Intent?): BridgeConfig {
+        if (intent == null || !intent.hasExtra(EXTRA_PORT)) return ConfigStore.load(this)
+        return BridgeConfig(
+            port = intent.getIntExtra(EXTRA_PORT, 2000),
+            tcpEnabled = intent.getBooleanExtra(EXTRA_TCP, true),
+            udpEnabled = intent.getBooleanExtra(EXTRA_UDP, false),
+            intervalMillis = intent.getLongExtra(EXTRA_INTERVAL, 1000L),
+            autoOffEnabled = intent.getBooleanExtra(EXTRA_AUTO_OFF, true),
         )
+    }
+
+    private fun start(newConfig: BridgeConfig) {
+        if (collectJob != null) {
+            // Already running: same config is a no-op, a different one restarts the
+            // session. Silently ignoring it used to leave the bridge on the old port /
+            // protocol while the UI showed the new settings.
+            if (config == newConfig) return
+            stopSession()
+        }
+
+        config = newConfig
+        ConfigStore.save(this, newConfig)
+        ConfigStore.saveStopReason(this, null)
 
         createNotificationChannel()
         startForegroundCompat()
+        acquireLocks()
 
         transports.clear()
-        transports += BridgeLogic.buildTransports(config)
+        transports += BridgeLogic.buildTransports(newConfig)
         transports.filterIsInstance<NmeaTcpServer>().forEach { tcp ->
-            tcp.onClientsChanged = { count ->
-                BridgeState.update { it.copy(tcpClients = count) }
-                updateNotification()
-                if (autoOffEnabled) {
-                    if (count > 0) cancelIdleOff() else armIdleOff()
-                }
-            }
+            tcp.onClientsChanged = { count -> onClientsChanged(count) }
         }
 
         // Publish enabled state immediately so the UI flips to "running".
         sent = 0
-        autoOffEnabled = config.tcpEnabled && !config.udpEnabled
+        heartbeats = 0
+        lastFix = null
+        lastFixAtMillis = 0L
+        lastSentAtMillis = 0L
+        lastClientCount = 0
+        autoOffEnabled = BridgeLogic.shouldArmIdleOff(newConfig)
         BridgeState.update {
             it.copy(
                 running = true,
-                port = config.port,
-                tcpEnabled = config.tcpEnabled,
-                udpEnabled = config.udpEnabled,
+                port = newConfig.port,
+                tcpEnabled = newConfig.tcpEnabled,
+                udpEnabled = newConfig.udpEnabled,
+                autoOffEnabled = autoOffEnabled,
                 tcpClients = 0,
                 sentencesSent = 0,
+                heartbeatsSent = 0,
+                lastFix = null,
+                lastFixAtMillis = null,
+                lastSendOkAtMillis = null,
+                fixValid = false,
             )
         }
         updateNotification()
@@ -120,31 +175,132 @@ class GpsBridgeService : Service() {
             BridgeState.update { it.copy(ipAddress = NetworkUtils.localIpAddress()) }
             updateNotification()
 
-            source.fixes(config.intervalMillis)
+            source.fixes(newConfig.intervalMillis)
                 .onEach { fix ->
-                    val lines = BridgeLogic.sentencesFor(fix)
-                    transports.forEach { it.broadcast(lines) }
-                    sent += lines.size
-                    BridgeState.update { it.copy(lastFix = fix, sentencesSent = sent) }
+                    lastFix = fix
+                    lastFixAtMillis = System.currentTimeMillis()
+                    emitCurrentFix(heartbeat = false)
                 }
                 .collect { }
+        }
+
+        // Heartbeat: a real NMEA source transmits continuously. When the GPS stops
+        // delivering (indoors, Doze, throttling) the stream used to just go quiet and
+        // Navionics kept drawing the last position forever; now the last fix keeps
+        // going out, flagged invalid once it is stale, and a client that reconnects
+        // gets a position without waiting for the next fix.
+        heartbeatJob = scope.launch {
+            val tick = maxOf(MIN_HEARTBEAT_TICK_MILLIS, newConfig.intervalMillis / 2)
+            while (currentCoroutineContext().isActive) {
+                delay(tick)
+                if (BridgeLogic.shouldResend(System.currentTimeMillis(), lastSentAtMillis, newConfig.intervalMillis)) {
+                    emitCurrentFix(heartbeat = true)
+                }
+            }
         }
 
         batteryJob = scope.launch { monitorBattery() }
 
         // Battery-saver watchdog: reception is only observable over TCP (UDP is
-        // connectionless), so this is armed only when TCP is the sole transport. It
-        // shuts the service down after AUTO_OFF_MILLIS with no connected client —
-        // both when nobody ever connects and when the last client disconnects.
+        // connectionless), so this is armed only when TCP is the sole transport and the
+        // user left it enabled. It shuts the service down after AUTO_OFF_MILLIS with no
+        // connected client — both when nobody ever connects and when the last one leaves.
         if (autoOffEnabled) armIdleOff()
+    }
+
+    /** Sends the current fix (fresh or repeated) to every transport, updating the diagnostics. */
+    @Synchronized
+    private fun emitCurrentFix(heartbeat: Boolean) {
+        val fix = lastFix ?: return
+        val current = config ?: return
+        val now = System.currentTimeMillis()
+        val valid = !BridgeLogic.isStale(now - lastFixAtMillis, current.intervalMillis)
+        val lines = BridgeLogic.sentencesFor(fix, valid)
+        val live = BridgeLogic.hasLiveConsumer(transports)
+
+        transports.forEach { it.broadcast(lines) }
+
+        sent += lines.size
+        if (heartbeat) heartbeats += lines.size
+        lastSentAtMillis = now
+        BridgeState.update {
+            it.copy(
+                lastFix = fix,
+                sentencesSent = sent,
+                heartbeatsSent = heartbeats,
+                lastFixAtMillis = lastFixAtMillis,
+                lastSendOkAtMillis = if (live) now else it.lastSendOkAtMillis,
+                fixValid = valid,
+            )
+        }
+    }
+
+    private fun onClientsChanged(count: Int) {
+        val previous = lastClientCount
+        lastClientCount = count
+        BridgeState.update { it.copy(tcpClients = count) }
+        updateNotification()
+        if (autoOffEnabled) {
+            if (count > 0) cancelIdleOff() else armIdleOff()
+        }
+        // A client that just connected would otherwise sit with an empty chart until the
+        // next fix arrives; give it the last known position right away.
+        if (count > previous) emitCurrentFix(heartbeat = true)
+    }
+
+    /**
+     * Keeps the CPU and the Wi-Fi radio awake while transmitting. A foreground service
+     * alone does neither: with the screen off the CPU suspends between wakeups and the
+     * Wi-Fi chip enters power save, which stalls the TCP stream and leaves Navionics
+     * showing a position that stopped updating.
+     */
+    @Suppress("DEPRECATION") // WIFI_MODE_FULL_HIGH_PERF, see below
+    private fun acquireLocks() {
+        try {
+            if (wakeLock == null) {
+                val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG).apply {
+                    setReferenceCounted(false)
+                    acquire()
+                }
+            }
+        } catch (e: Exception) {
+            // Without the lock the bridge still works with the screen on; don't fail the start.
+        }
+        try {
+            if (wifiLock == null) {
+                val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                // HIGH_PERF is deprecated but is the mode that actually survives screen-off;
+                // LOW_LATENCY only applies while the screen is on, which is not our case.
+                wifiLock = wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, WAKE_LOCK_TAG).apply {
+                    setReferenceCounted(false)
+                    acquire()
+                }
+            }
+        } catch (e: Exception) {
+            // Same: best effort.
+        }
+    }
+
+    private fun releaseLocks() {
+        try {
+            wakeLock?.takeIf { it.isHeld }?.release()
+        } catch (_: Exception) {
+        }
+        wakeLock = null
+        try {
+            wifiLock?.takeIf { it.isHeld }?.release()
+        } catch (_: Exception) {
+        }
+        wifiLock = null
     }
 
     @Synchronized
     private fun armIdleOff() {
         autoOffJob?.cancel()
         autoOffJob = scope.launch {
-            delay(AUTO_OFF_MILLIS)
-            withContext(Dispatchers.Main) { stopSelfAndCleanup() }
+            delay(autoOffMillis)
+            withContext(Dispatchers.Main) { stopSelfAndCleanup(StopReason.IDLE_TIMEOUT) }
         }
     }
 
@@ -192,28 +348,53 @@ class GpsBridgeService : Service() {
         null
     }
 
-    private fun stopSelfAndCleanup() {
+    /** Tears the transmitting session down, leaving the service itself alive. */
+    private fun stopSession() {
         autoOffEnabled = false
         collectJob?.cancel()
         collectJob = null
+        heartbeatJob?.cancel()
+        heartbeatJob = null
         batteryJob?.cancel()
         batteryJob = null
         autoOffJob?.cancel()
         autoOffJob = null
         transports.forEach {
             try {
+                it.detachClientCallback()
                 it.stop()
             } catch (_: Exception) {
             }
         }
         transports.clear()
         sent = 0
+        heartbeats = 0
+        lastFix = null
+        lastFixAtMillis = 0L
+        lastSentAtMillis = 0L
+        lastClientCount = 0
+        config = null
+    }
+
+    /** Detaches the client callback so a transport being torn down can't re-arm the watchdog. */
+    private fun NmeaTransport.detachClientCallback() {
+        if (this is NmeaTcpServer) onClientsChanged = null
+    }
+
+    private fun stopSelfAndCleanup(reason: StopReason) {
+        // Persisted so the UI can explain the silence even after the process is gone —
+        // an idle shutdown is otherwise indistinguishable from "the app died".
+        ConfigStore.saveStopReason(this, reason.takeIf { it != StopReason.USER })
+        if (reason == StopReason.IDLE_TIMEOUT) notifyAutoOff()
+        stopSession()
+        releaseLocks()
         BridgeState.reset()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
     override fun onDestroy() {
+        releaseLocks()
         scope.cancel()
         super.onDestroy()
     }
@@ -234,6 +415,30 @@ class GpsBridgeService : Service() {
     private fun updateNotification() {
         val mgr = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         mgr.notify(NOTIF_ID, buildNotification())
+    }
+
+    /** One-off, dismissible notice: the watchdog stopped the bridge and nobody would know. */
+    private fun notifyAutoOff() {
+        try {
+            createNotificationChannel()
+            val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle(getString(R.string.notif_autooff_title))
+                .setContentText(getString(R.string.notif_autooff_text, autoOffMillis / 60_000L))
+                .setSmallIcon(R.drawable.ic_bridge)
+                .setAutoCancel(true)
+                .setContentIntent(
+                    PendingIntent.getActivity(
+                        this, 2,
+                        Intent(this, MainActivity::class.java),
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    ),
+                )
+                .build()
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .notify(NOTIF_AUTO_OFF_ID, notification)
+        } catch (e: Exception) {
+            // A missing notification must never keep the service from shutting down.
+        }
     }
 
     private fun buildNotification(): Notification {
@@ -283,17 +488,23 @@ class GpsBridgeService : Service() {
     companion object {
         private const val CHANNEL_ID = "gps_bridge"
         private const val NOTIF_ID = 1
+        private const val NOTIF_AUTO_OFF_ID = 2
         private const val BATTERY_SAMPLE_MILLIS = 10_000L
-        private const val AUTO_OFF_MILLIS = 15 * 60 * 1000L
+        private const val MIN_HEARTBEAT_TICK_MILLIS = 200L
+        private const val WAKE_LOCK_TAG = "oshun:gps-bridge"
 
         /** Overridable so tests can supply a fake GPS source instead of Play Services. */
         var fixProviderFactory: (Context) -> FixProvider = { LocationSource(it) }
+
+        /** Idle shutdown window; overridable so tests don't have to wait 15 minutes. */
+        var autoOffMillis = 15 * 60 * 1000L
 
         const val ACTION_STOP = "com.oshun.gpsbridge.STOP"
         const val EXTRA_PORT = "port"
         const val EXTRA_TCP = "tcp"
         const val EXTRA_UDP = "udp"
         const val EXTRA_INTERVAL = "interval"
+        const val EXTRA_AUTO_OFF = "autooff"
 
         fun start(context: Context, config: BridgeConfig) {
             val intent = Intent(context, GpsBridgeService::class.java).apply {
@@ -301,6 +512,7 @@ class GpsBridgeService : Service() {
                 putExtra(EXTRA_TCP, config.tcpEnabled)
                 putExtra(EXTRA_UDP, config.udpEnabled)
                 putExtra(EXTRA_INTERVAL, config.intervalMillis)
+                putExtra(EXTRA_AUTO_OFF, config.autoOffEnabled)
             }
             context.startForegroundService(intent)
         }

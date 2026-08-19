@@ -8,6 +8,7 @@
     <string name="switch_tcp">TCP (servidor, 1-a-1 fiable)</string>
     <string name="switch_udp">UDP (broadcast, varios clientes)</string>
     <string name="label_interval">Intervalo de actualización</string>
+    <string name="switch_autooff">Apagado automático sin clientes (15 min)</string>
     <string name="net_none_title">Sin red local</string>
     <string name="net_none_body">La tablet no te va a encontrar. Prendé el hotspot del teléfono (o conectate a una Wi-Fi) para poder transmitir.</string>
     <string name="net_open_hotspot">Abrir configuración de hotspot</string>
@@ -27,6 +28,21 @@
     <string name="status_battery">Batería</string>
     <string name="status_draw">Consumo estimado</string>
     <string name="status_drain">Caída de batería</string>
+    <string name="status_last_fix">Último fix del GPS</string>
+    <string name="status_last_send">Último envío a un cliente</string>
+    <string name="status_heartbeats">Reenvíos (heartbeat)</string>
+    <string name="status_never">nunca</string>
+    <!-- %1$s: "12 s", "3 min 07 s", "1 h 04 min" -->
+    <string name="status_age">hace %1$s</string>
+    <string name="status_fix_stale">Fix viejo: se transmite marcado como inválido (RMC \"V\").</string>
+
+    <!-- Diagnostics / power banners -->
+    <string name="idle_banner_title">El puente se había apagado solo</string>
+    <string name="idle_banner_body">No hubo ningún cliente TCP conectado durante 15 minutos y se apagó para ahorrar batería. Si Navionics se te quedó con una posición vieja, fue por esto: podés desactivar el apagado automático más abajo.</string>
+    <string name="idle_banner_dismiss">Entendido</string>
+    <string name="battery_banner_title">Optimización de batería activada</string>
+    <string name="battery_banner_body">Android puede frenar la app con la pantalla apagada.</string>
+    <string name="battery_banner_action">Excluir a Oshun</string>
 
     <!-- Instructions card -->
     <string name="instructions_title">En la tablet (Navionics)</string>
@@ -53,4 +69,7 @@
     <string name="notif_content">%1$s:%2$d · %3$s</string>
     <!-- %1$s ip, %2$d port, %3$s protocols, %4$d tcp clients -->
     <string name="notif_content_clients">%1$s:%2$d · %3$s · %4$d cliente(s)</string>
+    <string name="notif_autooff_title">Oshun se apagó solo</string>
+    <!-- %1$d: minutos del watchdog -->
+    <string name="notif_autooff_text">Sin clientes TCP por %1$d min. Tocá para volver a iniciar.</string>
 </resources>

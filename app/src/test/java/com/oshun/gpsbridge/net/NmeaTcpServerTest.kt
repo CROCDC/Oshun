@@ -100,4 +100,60 @@ class NmeaTcpServerTest {
         s.stop() // no-op second stop
         assertEquals(0, s.clientCount)
     }
+
+    @Test
+    fun clientLeavingIsDetectedWithoutAnyBroadcast() {
+        // The failure this guards: the tablet goes away, nothing is being written at that
+        // instant, and the app keeps reporting a connected client forever.
+        val port = freePort()
+        val s = NmeaTcpServer(port).also { server = it }
+        val counts = mutableListOf<Int>()
+        s.onClientsChanged = { counts += it }
+        s.start()
+
+        val client = connect(port)
+        awaitClients(s, 1)
+        client.close()
+
+        awaitClients(s, 0) // detected by the reader thread, with no broadcast in between
+        assertEquals(listOf(1, 0), counts)
+    }
+
+    @Test
+    fun dataSentByTheClientIsDiscardedAndDeliveryContinues() {
+        // Navionics is a pure consumer, but a peer that does send must not break the stream.
+        val port = freePort()
+        val s = NmeaTcpServer(port).also { server = it }
+        s.start()
+        val client = connect(port)
+        awaitClients(s, 1)
+
+        client.getOutputStream().apply {
+            write("\$GPGGA,ignored*00\r\n".toByteArray(Charsets.US_ASCII))
+            flush()
+        }
+
+        s.broadcast(listOf("\$GPRMC,after*00\r\n"))
+        val line = BufferedReader(client.getInputStream().reader(Charsets.US_ASCII)).readLine()
+        assertEquals("\$GPRMC,after*00", line)
+        assertEquals(1, s.clientCount)
+
+        client.close()
+        awaitClients(s, 0)
+    }
+
+    @Test
+    fun stopDropsConnectedClients() {
+        val port = freePort()
+        val s = NmeaTcpServer(port).also { server = it }
+        s.start()
+        val client = connect(port)
+        awaitClients(s, 1)
+
+        s.stop()
+        assertEquals(0, s.clientCount)
+        // The client sees the connection close rather than hanging on a dead socket.
+        assertEquals(-1, client.getInputStream().read())
+        client.close()
+    }
 }

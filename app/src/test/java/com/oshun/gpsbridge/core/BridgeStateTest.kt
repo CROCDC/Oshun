@@ -19,7 +19,10 @@ class BridgeStateTest {
         val c = BridgeConfig()
         assertEquals(2000, c.port)
         assertTrue(c.tcpEnabled)
-        assertTrue(c.udpEnabled)
+        // TCP-only by default, matching the UI: a system-restarted service must not come
+        // back with a transport the user never picked.
+        assertFalse(c.udpEnabled)
+        assertTrue(c.autoOffEnabled)
         assertEquals(1000L, c.intervalMillis)
         assertEquals(9000, c.copy(port = 9000).port)
     }
@@ -31,7 +34,12 @@ class BridgeStateTest {
         assertNull(s.ipAddress)
         assertEquals(0, s.tcpClients)
         assertEquals(0L, s.sentencesSent)
+        assertEquals(0L, s.heartbeatsSent)
         assertNull(s.lastFix)
+        assertNull(s.lastFixAtMillis)
+        assertNull(s.lastSendOkAtMillis)
+        assertFalse(s.fixValid)
+        assertFalse(s.autoOffEnabled)
     }
 
     @Test

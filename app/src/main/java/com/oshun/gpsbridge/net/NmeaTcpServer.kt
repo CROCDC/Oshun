@@ -10,6 +10,11 @@ import java.util.Collections
  * connected client. In Navionics this is "Paired Devices → protocol TCP", host =
  * the phone's IP, port = [port]. Only one client connects in typical use, but
  * multiple are supported.
+ *
+ * Each client also gets a reader thread. We never expect input from Navionics — the
+ * point is detecting the *end* of the stream: when the tablet goes away, writes keep
+ * succeeding into the kernel buffer for a while, so without this the app reports a
+ * connected client and rising sentence counts while nothing reaches the tablet.
  */
 class NmeaTcpServer(private val port: Int) : NmeaTransport {
 
@@ -57,14 +62,47 @@ class NmeaTcpServer(private val port: Int) : NmeaTransport {
             } catch (_: Exception) {
             }
             clients.add(socket)
+            watchClient(socket)
             onClientsChanged?.invoke(clientCount)
         }
+    }
+
+    /**
+     * Blocks on the client's input until it reports end-of-stream (the tablet closed the
+     * connection or the socket broke), then drops the client. This is what makes a dead
+     * peer visible right away instead of minutes later, on the write that finally fails.
+     */
+    private fun watchClient(socket: Socket) {
+        Thread({
+            try {
+                val input = socket.getInputStream()
+                while (isRunning && !socket.isClosed) {
+                    if (input.read() == -1) break // peer closed; discard anything it sends
+                }
+            } catch (_: Exception) {
+                // Broken connection — same outcome as EOF.
+            }
+            removeClient(socket)
+        }, "nmea-tcp-watch").apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    /** Closes and forgets one client, notifying only when it was still in the list. */
+    private fun removeClient(socket: Socket) {
+        val wasConnected = synchronized(clients) { clients.remove(socket) }
+        try {
+            socket.close()
+        } catch (_: Exception) {
+        }
+        if (wasConnected) onClientsChanged?.invoke(clientCount)
     }
 
     override fun broadcast(lines: List<String>) {
         if (!isRunning || lines.isEmpty()) return
         val payload = lines.joinToString("").toByteArray(Charsets.US_ASCII)
-        var removedAny = false
+        val broken = mutableListOf<Socket>()
         synchronized(clients) {
             val it = clients.iterator()
             while (it.hasNext()) {
@@ -75,16 +113,18 @@ class NmeaTcpServer(private val port: Int) : NmeaTransport {
                         flush()
                     }
                 } catch (e: Exception) {
-                    try {
-                        s.close()
-                    } catch (_: Exception) {
-                    }
                     it.remove()
-                    removedAny = true
+                    broken += s
                 }
             }
         }
-        if (removedAny) onClientsChanged?.invoke(clientCount)
+        broken.forEach {
+            try {
+                it.close()
+            } catch (_: Exception) {
+            }
+        }
+        if (broken.isNotEmpty()) onClientsChanged?.invoke(clientCount)
     }
 
     override fun stop() {
@@ -96,7 +136,7 @@ class NmeaTcpServer(private val port: Int) : NmeaTransport {
         synchronized(clients) {
             clients.forEach {
                 try {
-                    it.close()
+                    it.close() // also unblocks its reader thread
                 } catch (_: Exception) {
                 }
             }

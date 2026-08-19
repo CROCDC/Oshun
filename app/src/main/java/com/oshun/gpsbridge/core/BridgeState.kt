@@ -9,8 +9,12 @@ import kotlinx.coroutines.flow.asStateFlow
 data class BridgeConfig(
     val port: Int = 2000,          // Navionics default UDP port
     val tcpEnabled: Boolean = true,
-    val udpEnabled: Boolean = true,
+    // TCP-only by default: it is the tested path and the one whose reception we can
+    // observe. Matches the UI default so a service restarted by the system with no
+    // intent behaves like the session the user configured.
+    val udpEnabled: Boolean = false,
     val intervalMillis: Long = 1000L,
+    val autoOffEnabled: Boolean = true,
 )
 
 /** Live status published by the foreground service and observed by the UI. */
@@ -21,8 +25,18 @@ data class BridgeStatus(
     val tcpEnabled: Boolean = false,
     val tcpClients: Int = 0,
     val udpEnabled: Boolean = false,
+    val autoOffEnabled: Boolean = false,
     val lastFix: Fix? = null,
     val sentencesSent: Long = 0,
+    // Diagnostics: without these a stalled bridge looked exactly like a healthy one.
+    /** Wall-clock time of the last fix received from the GPS, or null if none yet. */
+    val lastFixAtMillis: Long? = null,
+    /** Wall-clock time of the last send that had a live consumer (TCP client / UDP socket). */
+    val lastSendOkAtMillis: Long? = null,
+    /** False once the last fix is old enough that we transmit it flagged as invalid. */
+    val fixValid: Boolean = false,
+    /** Sentences emitted as heartbeat (a resend of the last fix), included in [sentencesSent]. */
+    val heartbeatsSent: Long = 0,
     val batteryPercent: Int? = null,
     val currentDrawMilliAmp: Int? = null,
     val batteryDrainPerHour: Double? = null,
