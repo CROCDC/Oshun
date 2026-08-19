@@ -5,6 +5,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.oshun.gpsbridge.core.StopReason
@@ -57,7 +58,9 @@ class IdleStopBannerTest {
             compose.onAllNodesWithText(title).fetchSemanticsNodes().isNotEmpty()
         }
 
-        compose.onNodeWithTag("idle_dismiss").performClick()
+        // The banner sits below the action button, so it may be off screen: scroll to it
+        // first — clicking a node that isn't displayed silently does nothing.
+        compose.onNodeWithTag("idle_dismiss").performScrollTo().performClick()
 
         compose.onNodeWithText(title).assertDoesNotExist()
         assertNull(ConfigStore.readStopReason(context))
