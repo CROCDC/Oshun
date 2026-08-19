@@ -92,11 +92,15 @@ jobs:
           disable-animations: true
           script: |
             ./gradlew connectedDebugAndroidTest --stacktrace
+            # Run the unit tests here too so jacocoMergedReport sees BOTH execution
+            # data sets (.exec + .ec). The jobs run on separate runners, so without
+            # this the "merged" report only ever covered the emulator run.
+            ./gradlew testDebugUnitTest --stacktrace
             ./gradlew jacocoMergedReport --stacktrace
 
-      - name: Coverage summary (instrumented)
+      - name: Coverage summary (merged unit + instrumented)
         if: always()
-        run: python3 ci/coverage_summary.py app/build/reports/jacoco/merged.xml "App (instrumented)"
+        run: python3 ci/coverage_summary.py app/build/reports/jacoco/merged.xml "App (merged)"
 
       - name: Upload instrumented coverage report
         if: always()
