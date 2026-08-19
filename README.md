@@ -124,7 +124,7 @@ Tres niveles de test:
    ```bash
    cd verify && gradle test jacocoTestCoverageVerification
    ```
-   Cobertura del core (instrucciones): **98%** — el gate falla el build si baja del 90%.
+   Cobertura del core (instrucciones): **97%** — el gate falla el build si baja del 90%.
 
 2. **Unitarios de la app (Robolectric)** — `GpsBridgeServiceTest` arranca el
    foreground service con un GPS falso y verifica el envío de NMEA por socket real:
@@ -137,9 +137,12 @@ Tres niveles de test:
    ./gradlew connectedDebugAndroidTest
    ```
 
-**Cobertura mergeada del módulo app** (unit + instrumentado): ~**90%+ líneas**. El
-task `jacocoMergedReport` une las dos ejecuciones. En CI, cada push imprime los
-porcentajes en el log/summary y sube los reportes HTML como artifacts
+**Cobertura mergeada del módulo app** (unit + instrumentado), medida por CI en cada
+push: **82% instrucciones / 85% líneas**. El task `jacocoMergedReport` une las dos
+ejecuciones, y para que ese número signifique algo el job del emulador corre también
+los unitarios antes de generarlo (los dos jobs viven en runners distintos, así que
+de lo contrario el reporte "mergeado" solo veía la mitad). Cada push imprime los
+porcentajes en el log y sube los reportes HTML como artifacts
 (`coverage-report`, `coverage-report-instrumented`). El único código excluido del
 denominador es `LocationSource` (wrapper de GPS real, no testeable sin hardware).
 
@@ -155,7 +158,7 @@ de batería, opcional: solo se usa cuando tocás el botón del banner).
 
 - [x] Core NMEA (RMC/GGA + checksum) con tests que pasan
 - [x] Transportes TCP y UDP con tests (sockets reales en loopback)
-- [x] Cobertura del core 98% con gate del 90% en CI; app mergeada ~93% instrucciones / 97% líneas
+- [x] Cobertura del core 97% con gate del 90% en CI; app mergeada 82% instrucciones / 85% líneas
 - [x] Foreground service + UI
 - [x] Intervalo de actualización del GPS configurable (0.5 / 1 / 2 / 5 s)
 - [x] Lectura de consumo de batería (nivel %, mA instantáneos, caída %/h)
