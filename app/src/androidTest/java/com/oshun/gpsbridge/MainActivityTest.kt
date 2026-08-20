@@ -47,8 +47,15 @@ class MainActivityTest {
             ConfigStore.saveStopReason(context, null)
             // An emulator has no hotspot and its Wi-Fi never turns off, so the start path
             // would be unreachable without standing in for the network conditions.
-            NetworkGate.stateProvider = { NetworkRequirements(hotspotUp = true, wifiOff = true) }
+            NetworkGate.stateProvider = { PAIRED_OVER_HOTSPOT }
         }
+
+        /** What a phone serving its own hotspot looks like. */
+        val PAIRED_OVER_HOTSPOT = NetworkRequirements(
+            hotspotUp = true,
+            wifiOff = true,
+            address = "192.168.43.1",
+        )
 
         @AfterClass
         @JvmStatic
@@ -177,7 +184,32 @@ class MainActivityTest {
             }
             compose.onNodeWithTag("action_button").assertIsNotEnabled()
         } finally {
-            NetworkGate.stateProvider = { NetworkRequirements(hotspotUp = true, wifiOff = true) }
+            NetworkGate.stateProvider = { PAIRED_OVER_HOTSPOT }
+        }
+    }
+
+    @Test
+    fun testModeRunsOverWhateverNetworkIsAtHand() {
+        // On land the house Wi-Fi is fine: the simulated boat never leaves the desk, and
+        // refusing it would break the feature that exists to test Navionics from dry land.
+        NetworkGate.stateProvider = {
+            NetworkRequirements(hotspotUp = false, wifiOff = false, address = "192.168.1.37")
+        }
+        try {
+            compose.waitUntil(timeoutMillis = 5_000) {
+                compose.onAllNodesWithText(str(R.string.net_req_title)).fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithTag("action_button").assertIsNotEnabled()
+
+            compose.onNodeWithTag("switch_sim").performScrollTo().performClick()
+
+            compose.waitUntil(timeoutMillis = 5_000) {
+                compose.onAllNodesWithText(str(R.string.net_req_title)).fetchSemanticsNodes().isEmpty()
+            }
+            compose.onNodeWithTag("action_button").assertIsEnabled()
+        } finally {
+            compose.onNodeWithTag("switch_sim").performScrollTo().performClick()
+            NetworkGate.stateProvider = { PAIRED_OVER_HOTSPOT }
         }
     }
 

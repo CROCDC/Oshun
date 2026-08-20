@@ -12,6 +12,8 @@
     <string name="switch_rawlog">Registrar cada posición en un CSV</string>
     <string name="net_req_title">Requisitos de red</string>
     <string name="net_req_body">El puente solo transmite sobre el hotspot del teléfono. En la amarra el Wi-Fi del club alcanza a los dos aparatos y parece que anda, pero a los pocos metros te quedás sin red y la carta se congela. El hotspot es el único enlace que zarpa con vos.</string>
+    <string name="net_req_body_sim">En modo prueba alcanza con que el teléfono y la tablet estén en la misma red: la corrida no sale del escritorio. Prendé el hotspot o conectate a una Wi-Fi.</string>
+    <string name="net_req_any">Alguna red local disponible</string>
     <string name="net_req_hotspot">Hotspot del teléfono encendido</string>
     <string name="net_req_wifi_off">Wi-Fi del teléfono apagado</string>
     <!-- %1$s: el requisito -->

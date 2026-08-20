@@ -48,8 +48,13 @@ Además, la IP que muestra la app es **la del hotspot**, no la de cualquier inte
 aparezca primero: antes podía mostrarte la de la Wi‑Fi (o incluso una de la red celular)
 mientras la tablet estaba del otro lado.
 
+**Única excepción: el modo prueba.** Con el barco simulado encendido alcanza con que los
+dos aparatos estén en la misma red (la de tu casa, por ejemplo), porque esa corrida no sale
+del escritorio. En navegación real el simulador está apagado, así que ahí la regla sigue
+siendo dura.
+
 > Si algún día navegás con un router propio a bordo, esta restricción te va a estorbar:
-> avisame y agregamos una excepción explícita.
+> avisame y agregamos una excepción explícita para ese caso.
 
 ## Dos transportes (elegís cuál usar)
 

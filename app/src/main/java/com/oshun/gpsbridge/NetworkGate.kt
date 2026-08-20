@@ -22,11 +22,14 @@ object NetworkGate {
     fun state(context: Context): NetworkRequirements = stateProvider(context)
 
     private fun read(context: Context): NetworkRequirements {
-        val hotspot = NetworkUtils.hotspotAddress()
+        val interfaces = NetworkUtils.localInterfaces()
+        val hotspot = NetworkUtils.hotspotAddress(interfaces)
+        val any = NetworkUtils.localIpAddress(interfaces)
         return NetworkRequirements(
             hotspotUp = hotspot != null,
             wifiOff = !isWifiEnabled(context),
-            address = hotspot,
+            address = hotspot ?: any,
+            anyLocalNetwork = any != null,
         )
     }
 

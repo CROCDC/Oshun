@@ -31,7 +31,9 @@ class IdleStopBannerTest {
         @BeforeClass
         @JvmStatic
         fun recordAnIdleShutdown() {
-            NetworkGate.stateProvider = { NetworkRequirements(hotspotUp = true, wifiOff = true) }
+            NetworkGate.stateProvider = {
+                NetworkRequirements(hotspotUp = true, wifiOff = true, address = "192.168.43.1")
+            }
             ConfigStore.saveStopReason(
                 InstrumentationRegistry.getInstrumentation().targetContext,
                 StopReason.IDLE_TIMEOUT,

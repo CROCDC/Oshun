@@ -162,9 +162,10 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
             )
         }
 
-        if (!network.met) {
+        if (!network.metFor(simulated)) {
             NetworkRequirementsCard(
                 network = network,
+                simulated = simulated,
                 onOpenHotspot = { openHotspotSettings(context) },
                 onOpenWifi = { openWifiSettings(context) },
             )
@@ -204,7 +205,7 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
         if (!status.running) {
             Button(
                 onClick = { permissionLauncher.launch(requiredPermissions) },
-                enabled = (tcpEnabled || udpEnabled) && network.met,
+                enabled = (tcpEnabled || udpEnabled) && network.metFor(simulated),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("action_button"),
@@ -304,28 +305,43 @@ private fun formatInterval(millis: Long): String {
 @Composable
 private fun NetworkRequirementsCard(
     network: NetworkRequirements,
+    simulated: Boolean,
     onOpenHotspot: () -> Unit,
     onOpenWifi: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.net_req_title), style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(R.string.net_req_body), style = MaterialTheme.typography.bodyMedium)
+            Text(
+                stringResource(if (simulated) R.string.net_req_body_sim else R.string.net_req_body),
+                style = MaterialTheme.typography.bodyMedium,
+            )
 
-            RequirementRow(
-                met = network.hotspotUp,
-                label = stringResource(R.string.net_req_hotspot),
-                actionLabel = stringResource(R.string.net_open_hotspot),
-                tag = "fix_hotspot",
-                onFix = onOpenHotspot,
-            )
-            RequirementRow(
-                met = network.wifiOff,
-                label = stringResource(R.string.net_req_wifi_off),
-                actionLabel = stringResource(R.string.net_open_wifi),
-                tag = "fix_wifi",
-                onFix = onOpenWifi,
-            )
+            if (simulated) {
+                // A simulated run never leaves the desk: any network both devices share works.
+                RequirementRow(
+                    met = network.anyLocalNetwork,
+                    label = stringResource(R.string.net_req_any),
+                    actionLabel = stringResource(R.string.net_open_hotspot),
+                    tag = "fix_hotspot",
+                    onFix = onOpenHotspot,
+                )
+            } else {
+                RequirementRow(
+                    met = network.hotspotUp,
+                    label = stringResource(R.string.net_req_hotspot),
+                    actionLabel = stringResource(R.string.net_open_hotspot),
+                    tag = "fix_hotspot",
+                    onFix = onOpenHotspot,
+                )
+                RequirementRow(
+                    met = network.wifiOff,
+                    label = stringResource(R.string.net_req_wifi_off),
+                    actionLabel = stringResource(R.string.net_open_wifi),
+                    tag = "fix_wifi",
+                    onFix = onOpenWifi,
+                )
+            }
         }
     }
 }

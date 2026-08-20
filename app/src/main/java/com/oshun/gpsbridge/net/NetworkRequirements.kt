@@ -14,6 +14,14 @@ data class NetworkRequirements(
     val wifiOff: Boolean,
     /** The address the tablet must be pointed at, when there is one. */
     val address: String? = null,
+    /** Any local network at all, hotspot or not. Enough for a dry-land test, never at sea. */
+    val anyLocalNetwork: Boolean = address != null,
 ) {
-    val met: Boolean get() = hotspotUp && wifiOff
+    /**
+     * Real navigation demands the hotspot. A simulated run does not leave the desk, so there
+     * the house Wi-Fi is fine — and refusing it would break the very feature that exists to
+     * test Navionics without going out on the water.
+     */
+    fun metFor(simulated: Boolean): Boolean =
+        if (simulated) anyLocalNetwork else hotspotUp && wifiOff
 }
