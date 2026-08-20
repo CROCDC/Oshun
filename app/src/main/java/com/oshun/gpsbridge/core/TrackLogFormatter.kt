@@ -27,7 +27,8 @@ object TrackLogFormatter {
             if (config.udpEnabled) add("UDP")
         }.joinToString("+").ifEmpty { "none" }
         return "# session ${utc(nowMillis)} port=${config.port} transports=$transports " +
-            "interval=${config.intervalMillis}ms autooff=${if (config.autoOffEnabled) "on" else "off"}"
+            "interval=${config.intervalMillis}ms autooff=${if (config.autoOffEnabled) "on" else "off"} " +
+            "source=${if (config.simulated) "simulated" else "gps"}"
     }
 
     /** Closes a session, naming why it ended. */

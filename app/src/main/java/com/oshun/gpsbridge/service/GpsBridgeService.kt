@@ -29,6 +29,7 @@ import com.oshun.gpsbridge.core.StopReason
 import com.oshun.gpsbridge.core.TrackLogFormatter
 import com.oshun.gpsbridge.location.FixProvider
 import com.oshun.gpsbridge.location.LocationSource
+import com.oshun.gpsbridge.location.SimulatedFixProvider
 import com.oshun.gpsbridge.model.Fix
 import com.oshun.gpsbridge.net.NetworkUtils
 import com.oshun.gpsbridge.net.NmeaTcpServer
@@ -118,6 +119,7 @@ class GpsBridgeService : Service() {
             intervalMillis = intent.getLongExtra(EXTRA_INTERVAL, 1000L),
             autoOffEnabled = intent.getBooleanExtra(EXTRA_AUTO_OFF, true),
             rawLogEnabled = intent.getBooleanExtra(EXTRA_RAW_LOG, true),
+            simulated = intent.getBooleanExtra(EXTRA_SIMULATED, false),
         )
     }
 
@@ -169,6 +171,9 @@ class GpsBridgeService : Service() {
                 detail = "${transports.joinToString("+") { it.label }}:${newConfig.port}",
             ),
         )
+        if (newConfig.simulated) {
+            EventLog.record(LogEvent(atMillis = startedAt, kind = EventKind.SIMULATION))
+        }
         if (newConfig.rawLogEnabled) {
             TrackLogWriter.open(this, TrackLogFormatter.sessionHeader(startedAt, newConfig))
         }
@@ -183,6 +188,7 @@ class GpsBridgeService : Service() {
                 tcpClients = 0,
                 sentencesSent = 0,
                 heartbeatsSent = 0,
+                simulated = newConfig.simulated,
                 lastFix = null,
                 lastFixAtMillis = null,
                 lastSendOkAtMillis = null,
@@ -192,7 +198,9 @@ class GpsBridgeService : Service() {
         }
         updateNotification()
 
-        val source = fixProviderFactory(this)
+        // Test mode bypasses the injectable factory on purpose: the simulator is the thing
+        // under test, so nothing may stand in for it.
+        val source = if (newConfig.simulated) SimulatedFixProvider() else fixProviderFactory(this)
         collectJob = scope.launch {
             // Bind sockets off the main thread — ServerSocket/DatagramSocket setup on
             // the main thread throws NetworkOnMainThreadException.
@@ -518,8 +526,13 @@ class GpsBridgeService : Service() {
             getString(R.string.notif_content, ip, status.port, protocols)
         }
 
+        val title = if (status.simulated) {
+            getString(R.string.notif_title_simulated)
+        } else {
+            getString(R.string.notif_title)
+        }
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.notif_title))
+            .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_bridge)
             .setOngoing(true)
@@ -561,6 +574,7 @@ class GpsBridgeService : Service() {
         const val EXTRA_INTERVAL = "interval"
         const val EXTRA_AUTO_OFF = "autooff"
         const val EXTRA_RAW_LOG = "rawlog"
+        const val EXTRA_SIMULATED = "sim"
 
         fun start(context: Context, config: BridgeConfig) {
             val intent = Intent(context, GpsBridgeService::class.java).apply {
@@ -570,6 +584,7 @@ class GpsBridgeService : Service() {
                 putExtra(EXTRA_INTERVAL, config.intervalMillis)
                 putExtra(EXTRA_AUTO_OFF, config.autoOffEnabled)
                 putExtra(EXTRA_RAW_LOG, config.rawLogEnabled)
+                putExtra(EXTRA_SIMULATED, config.simulated)
             }
             context.startForegroundService(intent)
         }

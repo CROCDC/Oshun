@@ -12,6 +12,9 @@ enum class EventKind {
 
     /** The fix went stale (transmitted as invalid) or came back. */
     FIX,
+
+    /** The session is transmitting the simulator's track, not the phone's GPS. */
+    SIMULATION,
 }
 
 /**

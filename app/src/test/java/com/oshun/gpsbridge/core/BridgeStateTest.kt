@@ -25,6 +25,8 @@ class BridgeStateTest {
         assertTrue(c.autoOffEnabled)
         // The CSV is on by default: the point of the log is having it when it fails.
         assertTrue(c.rawLogEnabled)
+        // Test mode is opt-in: nobody must transmit a simulated position by accident.
+        assertFalse(c.simulated)
         assertEquals(1000L, c.intervalMillis)
         assertEquals(9000, c.copy(port = 9000).port)
     }
@@ -42,6 +44,7 @@ class BridgeStateTest {
         assertNull(s.lastSendOkAtMillis)
         assertFalse(s.fixValid)
         assertFalse(s.autoOffEnabled)
+        assertFalse(s.simulated)
         assertNull(s.outcome)
     }
 

@@ -43,6 +43,32 @@ La app puede emitir por los dos a la vez; después probás cuál te funciona mej
 4. Ingresá **Host = IP del teléfono**, **Port = 2000**, **Protocol = TCP** (o UDP) y guardá.
 5. La posición del teléfono aparece y se mueve en la carta.
 
+## Modo prueba: barco simulado en el Río de la Plata
+
+Para probar la integración completa con Navionics **sin salir al agua**. Con el switch
+**Transmitir barco simulado** (en la tarjeta *Modo prueba*, debajo del botón Iniciar), el
+puente deja de leer el GPS del teléfono y transmite un barco que navega entre dos
+waypoints fijos en el medio del estuario:
+
+| | Latitud | Longitud |
+|---|---|---|
+| **A** | 34°57,000′ S | 057°33,000′ W |
+| **B** | 35°02,985′ S | 057°20,314′ W |
+
+Están **12,0 M** separados sobre un eje 120°/300°, y ambos en agua abierta: a 8–11 M de la
+costa argentina y más de 23 M de la uruguaya. A **4 nudos**, cada tramo dura 3 horas y el
+ciclo completo (ida y vuelta) 6 horas; el barco va y viene indefinidamente. En la carta lo
+vas a ver moverse a ~120 m por minuto.
+
+**Lo que sale por la red es idéntico a una navegación real** — y es a propósito: si
+marcáramos las sentencias como simuladas no estaríamos probando el mismo camino. El aviso
+está donde lo ve la persona, no la tablet:
+
+- La tarjeta de estado dice **"MODO PRUEBA: la posición es simulada, no es la tuya"**.
+- La notificación del servicio cambia a **"Oshun — MODO PRUEBA (posición simulada)"**.
+- El registro abre la sesión con un evento de modo prueba, y el CSV la marca con
+  `source=simulated`.
+
 ## Si Navionics se queda con una posición vieja
 
 Lo más engañoso de este puente es que puede *parecer* que anda mientras la tablet
@@ -125,6 +151,8 @@ app/
     core/BridgeLogic.kt        lógica pura del service (transportes, heartbeat, staleness, edades)
     core/ConfigCodec.kt        serializa la config para que sobreviva un reinicio del servicio
     core/StopReason.kt         por qué se detuvo el puente (usuario / apagado por inactividad)
+    core/Geo.kt                distancias, rumbos e interpolación sobre esfera (millas náuticas)
+    core/TrackSimulator.kt     barco simulado entre dos waypoints del Río de la Plata (puro)
     core/DeliveryOutcome.kt    qué pasó con cada envío (entregado / sin cliente / trabado / ciego)
     core/DeliveryTracker.kt    convierte el flujo de envíos en los pocos eventos que importan
     core/EventLog.kt           historial acotado de eventos, observable por la pantalla de registro
@@ -133,6 +161,7 @@ app/
     store/TrackLogWriter.kt    CSV rotativo en disco + copia compartible [Android]
     LogActivity.kt             pantalla de registro (Jetpack Compose) [Android]
     location/LocationSource.kt FusedLocationProvider → Fix (Flow) [Android]
+    location/SimulatedFixProvider.kt  el track simulado como fuente de fixes, para el modo prueba
     service/GpsBridgeService.kt foreground service, pantalla apagada [Android]
     MainActivity.kt            UI (Jetpack Compose) [Android]
   src/test/java/com/oshun/gpsbridge/
@@ -215,6 +244,7 @@ de batería, opcional: solo se usa cuando tocás el botón del banner).
 - [x] Diagnóstico en pantalla: edad del último fix, del último envío y motivo del último apagado
 - [x] Registro de sesión en la app + CSV rotativo de cada posición, con el resultado de cada envío
 - [x] Sockets no bloqueantes: se distingue "no había nadie" de "mandé y no lo consumieron"
+- [x] Modo prueba: barco simulado a 4 nudos entre dos waypoints a 12 M, para probar Navionics en seco
 - [x] Código en inglés; todos los textos de UI en `res/values/strings.xml`
 - [x] CI que compila el APK y lo publica como artifact
 - [ ] Prueba de campo real contra Navionics (pendiente de hardware)

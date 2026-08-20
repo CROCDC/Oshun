@@ -102,6 +102,7 @@ class GpsBridgeServiceTest {
         udp: Boolean,
         autoOff: Boolean = true,
         rawLog: Boolean = true,
+        simulated: Boolean = false,
     ): Intent = Intent(RuntimeEnvironment.getApplication(), GpsBridgeService::class.java).apply {
         putExtra(GpsBridgeService.EXTRA_PORT, port)
         putExtra(GpsBridgeService.EXTRA_TCP, tcp)
@@ -109,6 +110,7 @@ class GpsBridgeServiceTest {
         putExtra(GpsBridgeService.EXTRA_INTERVAL, 100L)
         putExtra(GpsBridgeService.EXTRA_AUTO_OFF, autoOff)
         putExtra(GpsBridgeService.EXTRA_RAW_LOG, rawLog)
+        putExtra(GpsBridgeService.EXTRA_SIMULATED, simulated)
     }
 
     private fun startService(
@@ -117,7 +119,8 @@ class GpsBridgeServiceTest {
         udp: Boolean,
         autoOff: Boolean = true,
         rawLog: Boolean = true,
-    ): GpsBridgeService = startWith(startIntent(port, tcp, udp, autoOff, rawLog))
+        simulated: Boolean = false,
+    ): GpsBridgeService = startWith(startIntent(port, tcp, udp, autoOff, rawLog, simulated))
 
     private fun trackFile(): File = File(File(RuntimeEnvironment.getApplication().filesDir, "logs"), "track.csv")
 
@@ -424,6 +427,42 @@ class GpsBridgeServiceTest {
 
         stop(service)
         awaitRunning(false)
+    }
+
+    @Test
+    fun testModeTransmitsTheSimulatedRiverTrack() {
+        // The whole point of test mode: exercise the real path to Navionics from dry land.
+        val port = freePort()
+        GpsBridgeService.fixProviderFactory = {
+            throw IllegalStateException("test mode must not touch the phone's GPS")
+        }
+
+        val service = startService(port, tcp = true, udp = false, simulated = true)
+        assertTrue("the session is marked as simulated", BridgeState.status.value.simulated)
+        awaitEvent(EventKind.SIMULATION)
+
+        val client = connect(port)
+        val line = BufferedReader(client.getInputStream().reader(Charsets.US_ASCII)).readLine()
+        val fields = line.split(",")
+
+        assertEquals("\$GPRMC", fields[0])
+        assertEquals("A", fields[2])
+        // 34°57'S 057°33'W — the first waypoint, mid Río de la Plata.
+        assertTrue("latitude ${fields[3]}", fields[3].startsWith("3457."))
+        assertEquals("S", fields[4])
+        assertTrue("longitude ${fields[5]}", fields[5].startsWith("05733."))
+        assertEquals("W", fields[6])
+        assertEquals("speed in knots", 4.0, fields[7].toDouble(), 0.1)
+        assertEquals("course", 120.0, fields[8].toDouble(), 1.0)
+
+        client.close()
+        stop(service)
+        awaitRunning(false)
+
+        assertTrue(
+            "the CSV says the track was simulated",
+            trackFile().readLines().any { it.contains("source=simulated") },
+        )
     }
 
     private fun connect(port: Int): Socket {

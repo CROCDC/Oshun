@@ -87,6 +87,7 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
     var intervalMillis by remember { mutableStateOf(saved.intervalMillis) }
     var autoOffEnabled by remember { mutableStateOf(saved.autoOffEnabled) }
     var rawLogEnabled by remember { mutableStateOf(saved.rawLogEnabled) }
+    var simulated by remember { mutableStateOf(saved.simulated) }
     var lastCrash by remember { mutableStateOf(CrashStore.read(context)) }
     // Why the bridge stopped last time; an idle shutdown is otherwise invisible.
     var lastStop by remember { mutableStateOf(ConfigStore.readStopReason(context)) }
@@ -127,6 +128,7 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
                     intervalMillis = intervalMillis,
                     autoOffEnabled = autoOffEnabled,
                     rawLogEnabled = rawLogEnabled,
+                    simulated = simulated,
                 ),
             )
         }
@@ -219,6 +221,12 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
                 .testTag("open_log"),
         ) { Text(stringResource(R.string.log_open)) }
 
+        TestModeCard(
+            enabled = simulated,
+            editable = !status.running,
+            onChange = { simulated = it },
+        )
+
         // Advisory banners live below the action button: they explain and suggest, and
         // pushing the primary action off screen to show them is the wrong trade.
         if (lastStop == StopReason.IDLE_TIMEOUT && !status.running) {
@@ -309,6 +317,21 @@ private fun openHotspotSettings(context: Context) {
     }
 }
 
+/**
+ * Test mode: a simulated boat instead of the phone's GPS. Called out loudly, because a
+ * chart plotter showing a position that is not yours is worse than one showing none.
+ */
+@Composable
+private fun TestModeCard(enabled: Boolean, editable: Boolean, onChange: (Boolean) -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.sim_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.sim_body), style = MaterialTheme.typography.bodyMedium)
+            SwitchRow(stringResource(R.string.switch_sim), "switch_sim", enabled, editable, onChange)
+        }
+    }
+}
+
 /** The bridge shut itself down for lack of clients: say so, it explains a frozen chart. */
 @Composable
 private fun IdleStopBanner(onDismiss: () -> Unit) {
@@ -381,6 +404,13 @@ private fun StatusCard(status: BridgeStatus, nowMillis: Long) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(R.string.status_title), style = MaterialTheme.typography.titleMedium)
+            if (status.simulated) {
+                Text(
+                    stringResource(R.string.status_simulated),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
             KeyValue(stringResource(R.string.status_ip), status.ipAddress ?: stringResource(R.string.status_no_wifi))
             KeyValue(stringResource(R.string.status_port), status.port.toString())
             val protocols = BridgeLogic.enabledProtocols(status)
