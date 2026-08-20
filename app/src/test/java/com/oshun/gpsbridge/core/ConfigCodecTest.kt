@@ -15,6 +15,7 @@ class ConfigCodecTest {
             udpEnabled = true,
             intervalMillis = 500L,
             autoOffEnabled = false,
+            rawLogEnabled = false,
         )
         assertEquals(config, ConfigCodec.decode(ConfigCodec.encode(config)))
     }
@@ -72,6 +73,9 @@ class ConfigCodecTest {
         assertTrue(ConfigCodec.decode("tcp=1").tcpEnabled)
         assertFalse(ConfigCodec.decode("autooff=0").autoOffEnabled)
         assertTrue(ConfigCodec.decode("autooff=1").autoOffEnabled)
+        assertFalse(ConfigCodec.decode("rawlog=0").rawLogEnabled)
+        assertTrue(ConfigCodec.decode("rawlog=1").rawLogEnabled)
+        assertTrue(ConfigCodec.decode("rawlog=maybe").rawLogEnabled)
         // Unparseable booleans keep the default rather than flipping silently.
         assertTrue(ConfigCodec.decode("tcp=maybe").tcpEnabled)
         assertTrue(ConfigCodec.decode("autooff=maybe").autoOffEnabled)

@@ -33,7 +33,11 @@ class NmeaUdpBroadcasterTest {
         assertEquals("UDP", b.label)
         assertEquals(0, b.clientCount)
 
-        b.broadcast(listOf("\$GPGGA,udp*00\r\n"))
+        val result = b.broadcast(listOf("\$GPGGA,udp*00\r\n"), nowMillis = 1_000L)
+        // UDP can never say more than "it left": there is no acknowledgement to wait for.
+        assertTrue(result.blind)
+        assertEquals(0, result.clients)
+        assertFalse(result.down)
 
         val buf = ByteArray(256)
         val packet = DatagramPacket(buf, buf.size)
@@ -46,14 +50,15 @@ class NmeaUdpBroadcasterTest {
     fun broadcastBeforeStartIsNoop() {
         val b = NmeaUdpBroadcaster(9999).also { udp = it }
         assertFalse(b.isRunning)
-        b.broadcast(listOf("ignored\r\n")) // socket is null -> no-op, no throw
+        val result = b.broadcast(listOf("ignored\r\n"), nowMillis = 0L) // socket is null
+        assertTrue(result.down)
     }
 
     @Test
     fun emptyLinesAreNotSent() {
         val b = NmeaUdpBroadcaster(9999, broadcastAddress = "127.0.0.1").also { udp = it }
         b.start()
-        b.broadcast(emptyList()) // no-op
+        b.broadcast(emptyList(), nowMillis = 0L) // no-op
     }
 
     @Test

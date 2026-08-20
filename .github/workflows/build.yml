@@ -33,13 +33,13 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Core tests + 90% coverage gate
-        run: ./gradlew -p verify test jacocoTestCoverageVerification --stacktrace
+        run: ./gradlew -p verify test jacocoTestCoverageVerification
 
       - name: App unit tests (JVM + Robolectric)
-        run: ./gradlew :app:testDebugUnitTest --stacktrace
+        run: ./gradlew :app:testDebugUnitTest
 
       - name: App unit coverage report
-        run: ./gradlew :app:jacocoMergedReport --stacktrace
+        run: ./gradlew :app:jacocoMergedReport
 
       - name: Coverage summary
         if: always()
@@ -91,12 +91,12 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: |
-            ./gradlew connectedDebugAndroidTest --stacktrace
+            ./gradlew connectedDebugAndroidTest
             # Run the unit tests here too so jacocoMergedReport sees BOTH execution
             # data sets (.exec + .ec). The jobs run on separate runners, so without
             # this the "merged" report only ever covered the emulator run.
-            ./gradlew testDebugUnitTest --stacktrace
-            ./gradlew jacocoMergedReport --stacktrace
+            ./gradlew testDebugUnitTest
+            ./gradlew jacocoMergedReport
 
       - name: Coverage summary (merged unit + instrumented)
         if: always()
@@ -139,7 +139,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4

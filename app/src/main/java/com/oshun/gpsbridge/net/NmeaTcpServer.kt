@@ -1,148 +1,211 @@
 package com.oshun.gpsbridge.net
 
 import java.net.InetSocketAddress
-import java.net.ServerSocket
-import java.net.Socket
-import java.util.Collections
+import java.nio.ByteBuffer
+import java.nio.channels.ServerSocketChannel
+import java.nio.channels.SocketChannel
 
 /**
- * TCP transport: opens a server socket and streams NMEA sentences to every
- * connected client. In Navionics this is "Paired Devices → protocol TCP", host =
- * the phone's IP, port = [port]. Only one client connects in typical use, but
- * multiple are supported.
+ * TCP transport: opens a server socket and streams NMEA sentences to every connected
+ * client. In Navionics this is "Paired Devices → protocol TCP", host = the phone's IP,
+ * port = [port]. Only one client connects in typical use, but multiple are supported.
  *
- * Each client also gets a reader thread. We never expect input from Navionics — the
- * point is detecting the *end* of the stream: when the tablet goes away, writes keep
- * succeeding into the kernel buffer for a while, so without this the app reports a
- * connected client and rising sentence counts while nothing reaches the tablet.
+ * Sockets are **non-blocking** on purpose. Blocking writes hid the failure that matters:
+ * when the tablet stops reading, the kernel buffer fills and a blocking write simply
+ * waits, so the app reported a healthy client and rising counters while nothing arrived.
+ * A non-blocking write reports how many bytes the peer's window accepted, which is what
+ * lets the log say "sent, and nobody consumed it". It also means one stuck client can
+ * never stall the emitter.
  */
-class NmeaTcpServer(private val port: Int) : NmeaTransport {
+class NmeaTcpServer(
+    private val port: Int,
+    /** A client backed up for longer than this is hopeless: cut it so it can reconnect. */
+    private val dropAfterStalledMillis: Long = 60_000L,
+    /**
+     * Deliberately small: a large send buffer would let megabytes of stale positions queue
+     * up for a tablet that is not reading, so the chart would replay old fixes instead of
+     * jumping to the current one — and the backlog would hide the stall from the log.
+     */
+    private val sendBufferBytes: Int = 32 * 1024,
+) : NmeaTransport {
 
     override val label = "TCP"
 
+    private class Client(val channel: SocketChannel, val remote: String) {
+        /** Tail of the last batch the peer's window could not take. */
+        var pending: ByteBuffer? = null
+        var backedUpSinceMillis = 0L
+    }
+
     @Volatile
-    private var serverSocket: ServerSocket? = null
-    private val clients = Collections.synchronizedList(mutableListOf<Socket>())
+    private var serverChannel: ServerSocketChannel? = null
+    private val clients = mutableListOf<Client>()
     private var acceptThread: Thread? = null
+    private val scratch = ByteBuffer.allocate(256)
 
     @Volatile
     override var isRunning = false
         private set
 
     override val clientCount: Int
-        get() = clients.size
+        get() = synchronized(clients) { clients.size }
 
     /** Invoked (off the main thread) whenever the connected-client count changes. */
     @Volatile
     var onClientsChanged: ((Int) -> Unit)? = null
 
+    /** Invoked when a client attaches or leaves, with its address, for the session log. */
+    @Volatile
+    var onClientEvent: ((connected: Boolean, remote: String) -> Unit)? = null
+
     override fun start() {
         if (isRunning) return
-        val ss = ServerSocket()
-        ss.reuseAddress = true
-        ss.bind(InetSocketAddress(port))
-        serverSocket = ss
+        val server = ServerSocketChannel.open()
+        server.socket().reuseAddress = true
+        server.socket().bind(InetSocketAddress(port))
+        serverChannel = server
         isRunning = true
-        acceptThread = Thread({ acceptLoop(ss) }, "nmea-tcp-accept").apply {
+        acceptThread = Thread({ acceptLoop(server) }, "nmea-tcp-accept").apply {
             isDaemon = true
             start()
         }
     }
 
-    private fun acceptLoop(ss: ServerSocket) {
+    private fun acceptLoop(server: ServerSocketChannel) {
         while (isRunning) {
-            val socket = try {
-                ss.accept()
+            val channel = try {
+                server.accept() ?: continue
             } catch (e: Exception) {
                 if (isRunning) continue else break
             }
-            try {
-                socket.keepAlive = true
-                socket.tcpNoDelay = true
-            } catch (_: Exception) {
+            val remote = try {
+                channel.configureBlocking(false)
+                channel.socket().tcpNoDelay = true
+                channel.socket().keepAlive = true
+                channel.socket().sendBufferSize = sendBufferBytes
+                (channel.remoteAddress as? InetSocketAddress)?.address?.hostAddress ?: "?"
+            } catch (e: Exception) {
+                "?"
             }
-            clients.add(socket)
-            watchClient(socket)
-            onClientsChanged?.invoke(clientCount)
+            val count = synchronized(clients) {
+                clients += Client(channel, remote)
+                clients.size
+            }
+            onClientEvent?.invoke(true, remote)
+            onClientsChanged?.invoke(count)
         }
     }
+
+    override fun broadcast(lines: List<String>, nowMillis: Long): SendResult {
+        if (!isRunning) return SendResult(label, down = true)
+        if (lines.isEmpty()) return SendResult(label, clients = clientCount)
+
+        val payload = lines.joinToString("").toByteArray(Charsets.US_ASCII)
+        var accepted = 0
+        var stalled = 0
+        val gone = mutableListOf<Client>()
+
+        val remaining = synchronized(clients) {
+            val iterator = clients.iterator()
+            while (iterator.hasNext()) {
+                val client = iterator.next()
+                when (send(client, payload, nowMillis)) {
+                    Status.ACCEPTED -> accepted++
+                    Status.STALLED -> stalled++
+                    Status.GONE -> {
+                        iterator.remove()
+                        gone += client
+                    }
+                }
+            }
+            clients.size
+        }
+
+        gone.forEach { close(it) }
+        if (gone.isNotEmpty()) {
+            gone.forEach { onClientEvent?.invoke(false, it.remote) }
+            onClientsChanged?.invoke(remaining)
+        }
+
+        return SendResult(
+            label = label,
+            clients = remaining + gone.size,
+            accepted = accepted,
+            stalled = stalled,
+            dropped = gone.size,
+        )
+    }
+
+    private enum class Status { ACCEPTED, STALLED, GONE }
 
     /**
-     * Blocks on the client's input until it reports end-of-stream (the tablet closed the
-     * connection or the socket broke), then drops the client. This is what makes a dead
-     * peer visible right away instead of minutes later, on the write that finally fails.
+     * Writes one batch to one client. While a client is backed up we deliberately drop new
+     * batches instead of queueing them: a position that arrives late is worse than useless,
+     * and an unbounded queue would just turn a stalled tablet into an OOM.
      */
-    private fun watchClient(socket: Socket) {
-        Thread({
-            try {
-                val input = socket.getInputStream()
-                while (isRunning && !socket.isClosed) {
-                    if (input.read() == -1) break // peer closed; discard anything it sends
+    private fun send(client: Client, payload: ByteArray, nowMillis: Long): Status {
+        try {
+            if (peerClosed(client)) return Status.GONE
+
+            val queued = client.pending
+            if (queued != null) {
+                client.channel.write(queued)
+                if (queued.hasRemaining()) {
+                    return if (nowMillis - client.backedUpSinceMillis >= dropAfterStalledMillis) {
+                        Status.GONE
+                    } else {
+                        Status.STALLED
+                    }
                 }
-            } catch (_: Exception) {
-                // Broken connection — same outcome as EOF.
+                client.pending = null
+                client.backedUpSinceMillis = 0L
             }
-            removeClient(socket)
-        }, "nmea-tcp-watch").apply {
-            isDaemon = true
-            start()
+
+            val buffer = ByteBuffer.wrap(payload)
+            client.channel.write(buffer)
+            if (buffer.hasRemaining()) {
+                // The peer's receive window is full: it is not draining what we send.
+                client.pending = buffer
+                client.backedUpSinceMillis = nowMillis
+                return Status.STALLED
+            }
+            return Status.ACCEPTED
+        } catch (e: Exception) {
+            return Status.GONE
         }
     }
 
-    /** Closes and forgets one client, notifying only when it was still in the list. */
-    private fun removeClient(socket: Socket) {
-        val wasConnected = synchronized(clients) { clients.remove(socket) }
+    /** True once the peer closed its side. Anything it sends us is a consumer's business, not ours. */
+    private fun peerClosed(client: Client): Boolean {
+        while (true) {
+            scratch.clear()
+            val read = client.channel.read(scratch)
+            if (read == -1) return true
+            if (read == 0) return false
+        }
+    }
+
+    private fun close(client: Client) {
         try {
-            socket.close()
+            client.channel.close()
         } catch (_: Exception) {
         }
-        if (wasConnected) onClientsChanged?.invoke(clientCount)
-    }
-
-    override fun broadcast(lines: List<String>) {
-        if (!isRunning || lines.isEmpty()) return
-        val payload = lines.joinToString("").toByteArray(Charsets.US_ASCII)
-        val broken = mutableListOf<Socket>()
-        synchronized(clients) {
-            val it = clients.iterator()
-            while (it.hasNext()) {
-                val s = it.next()
-                try {
-                    s.getOutputStream().apply {
-                        write(payload)
-                        flush()
-                    }
-                } catch (e: Exception) {
-                    it.remove()
-                    broken += s
-                }
-            }
-        }
-        broken.forEach {
-            try {
-                it.close()
-            } catch (_: Exception) {
-            }
-        }
-        if (broken.isNotEmpty()) onClientsChanged?.invoke(clientCount)
     }
 
     override fun stop() {
         isRunning = false
         try {
-            serverSocket?.close()
+            serverChannel?.close()
         } catch (_: Exception) {
         }
-        synchronized(clients) {
-            clients.forEach {
-                try {
-                    it.close() // also unblocks its reader thread
-                } catch (_: Exception) {
-                }
-            }
+        val leaving = synchronized(clients) {
+            val snapshot = clients.toList()
             clients.clear()
+            snapshot
         }
-        serverSocket = null
+        leaving.forEach { close(it) }
+        serverChannel = null
+        leaving.forEach { onClientEvent?.invoke(false, it.remote) }
         onClientsChanged?.invoke(0)
     }
 }

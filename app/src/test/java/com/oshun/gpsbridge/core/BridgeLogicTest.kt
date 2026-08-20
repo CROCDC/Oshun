@@ -2,8 +2,8 @@ package com.oshun.gpsbridge.core
 
 import com.oshun.gpsbridge.model.Fix
 import com.oshun.gpsbridge.net.NmeaTcpServer
-import com.oshun.gpsbridge.net.NmeaTransport
 import com.oshun.gpsbridge.net.NmeaUdpBroadcaster
+import com.oshun.gpsbridge.net.SendResult
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -13,23 +13,11 @@ import org.junit.Test
 
 class BridgeLogicTest {
 
-    private val started = mutableListOf<NmeaTransport>()
+    private val tcp = SendResult(label = "TCP")
+    private val udp = SendResult(label = "UDP", blind = true)
 
     @After
-    fun tearDown() {
-        started.forEach { runCatching { it.stop() } }
-        started.clear()
-    }
-
-    /** Stand-in for a transport with attached consumers, without opening a socket. */
-    private fun fakeTransport(running: Boolean, clients: Int) = object : NmeaTransport {
-        override val label = "FAKE"
-        override val isRunning = running
-        override val clientCount = clients
-        override fun start() = Unit
-        override fun broadcast(lines: List<String>) = Unit
-        override fun stop() = Unit
-    }
+    fun tearDown() = Unit
 
     private val fix = Fix(
         latitude = 10.0,
@@ -134,17 +122,58 @@ class BridgeLogicTest {
     }
 
     @Test
-    fun hasLiveConsumerNeedsAnAttachedClientOrUdp() {
-        assertFalse(BridgeLogic.hasLiveConsumer(emptyList()))
-        assertFalse("stopped transports deliver nothing", BridgeLogic.hasLiveConsumer(listOf(fakeTransport(running = false, clients = 3))))
-        assertFalse("a TCP server with no client delivers nothing", BridgeLogic.hasLiveConsumer(listOf(fakeTransport(running = true, clients = 0))))
-        assertTrue(BridgeLogic.hasLiveConsumer(listOf(fakeTransport(running = true, clients = 1))))
+    fun outcomeIsOkWhenSomeoneTookTheBytes() {
+        assertEquals(
+            DeliveryOutcome.OK,
+            BridgeLogic.outcomeFor(listOf(tcp.copy(clients = 1, accepted = 1))),
+        )
+        // One healthy client is enough, even next to a stalled one.
+        assertEquals(
+            DeliveryOutcome.OK,
+            BridgeLogic.outcomeFor(listOf(tcp.copy(clients = 2, accepted = 1, stalled = 1))),
+        )
+    }
 
-        // UDP is connectionless: once the socket is up, datagrams do leave the phone.
-        val udp = NmeaUdpBroadcaster(port = 0).also { started += it }
-        assertFalse("not started yet", BridgeLogic.hasLiveConsumer(listOf(udp)))
-        udp.start()
-        assertTrue(BridgeLogic.hasLiveConsumer(listOf(udp)))
+    @Test
+    fun outcomeNamesTheMostActionableProblem() {
+        assertEquals(
+            "backed up beats a blind UDP send",
+            DeliveryOutcome.STALLED,
+            BridgeLogic.outcomeFor(listOf(tcp.copy(clients = 1, stalled = 1), udp)),
+        )
+        assertEquals(
+            DeliveryOutcome.DROPPED,
+            BridgeLogic.outcomeFor(listOf(tcp.copy(clients = 1, dropped = 1), udp)),
+        )
+        assertEquals(DeliveryOutcome.BLIND, BridgeLogic.outcomeFor(listOf(tcp, udp)))
+        assertEquals(DeliveryOutcome.NO_CLIENT, BridgeLogic.outcomeFor(listOf(tcp)))
+    }
+
+    @Test
+    fun outcomeIsNotSentWithoutAWorkingTransport() {
+        assertEquals(DeliveryOutcome.NOT_SENT, BridgeLogic.outcomeFor(emptyList()))
+        assertEquals(
+            DeliveryOutcome.NOT_SENT,
+            BridgeLogic.outcomeFor(listOf(tcp.copy(down = true), udp.copy(blind = false, down = true))),
+        )
+    }
+
+    @Test
+    fun onlyDeliveredAndBlindEverLeaveThePhone() {
+        assertTrue(BridgeLogic.leftThePhone(DeliveryOutcome.OK))
+        assertTrue(BridgeLogic.leftThePhone(DeliveryOutcome.BLIND))
+        assertFalse(BridgeLogic.leftThePhone(DeliveryOutcome.NO_CLIENT))
+        assertFalse(BridgeLogic.leftThePhone(DeliveryOutcome.STALLED))
+        assertFalse(BridgeLogic.leftThePhone(DeliveryOutcome.DROPPED))
+        assertFalse(BridgeLogic.leftThePhone(DeliveryOutcome.NOT_SENT))
+    }
+
+    @Test
+    fun logColumnsSummariseTheTransports() {
+        assertEquals("TCP+UDP", BridgeLogic.transportsToken(listOf(tcp, udp)))
+        assertEquals("none", BridgeLogic.transportsToken(emptyList()))
+        assertEquals(3, BridgeLogic.clientTotal(listOf(tcp.copy(clients = 3), udp)))
+        assertEquals(0, BridgeLogic.clientTotal(emptyList()))
     }
 
     @Test

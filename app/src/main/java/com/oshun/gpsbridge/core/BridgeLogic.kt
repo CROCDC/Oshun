@@ -4,6 +4,7 @@ import com.oshun.gpsbridge.model.Fix
 import com.oshun.gpsbridge.net.NmeaTcpServer
 import com.oshun.gpsbridge.net.NmeaTransport
 import com.oshun.gpsbridge.net.NmeaUdpBroadcaster
+import com.oshun.gpsbridge.net.SendResult
 import com.oshun.gpsbridge.nmea.NmeaFormatter
 import java.util.Locale
 
@@ -48,9 +49,31 @@ object BridgeLogic {
     fun shouldArmIdleOff(config: BridgeConfig): Boolean =
         config.autoOffEnabled && config.tcpEnabled && !config.udpEnabled
 
-    /** True when at least one transport can actually deliver right now (TCP client attached, or UDP up). */
-    fun hasLiveConsumer(transports: List<NmeaTransport>): Boolean =
-        transports.any { it.isRunning && (it is NmeaUdpBroadcaster || it.clientCount > 0) }
+    /**
+     * What became of one batch, across every transport. Ordered by how much it matters to
+     * someone staring at a frozen chart: a client that took the bytes wins, then the states
+     * that explain silence, most actionable first.
+     */
+    fun outcomeFor(results: List<SendResult>): DeliveryOutcome = when {
+        results.isEmpty() -> DeliveryOutcome.NOT_SENT
+        results.any { it.accepted > 0 } -> DeliveryOutcome.OK
+        results.any { it.stalled > 0 } -> DeliveryOutcome.STALLED
+        results.any { it.dropped > 0 } -> DeliveryOutcome.DROPPED
+        results.any { it.blind } -> DeliveryOutcome.BLIND
+        results.any { !it.down } -> DeliveryOutcome.NO_CLIENT
+        else -> DeliveryOutcome.NOT_SENT
+    }
+
+    /** True when the batch reached the network at all, so the UI can age the last real delivery. */
+    fun leftThePhone(outcome: DeliveryOutcome): Boolean =
+        outcome == DeliveryOutcome.OK || outcome == DeliveryOutcome.BLIND
+
+    /** Transports as a compact CSV token, e.g. "TCP+UDP". */
+    fun transportsToken(results: List<SendResult>): String =
+        results.joinToString("+") { it.label }.ifEmpty { "none" }
+
+    /** Consumers we can actually count (TCP clients; UDP is connectionless). */
+    fun clientTotal(results: List<SendResult>): Int = results.sumOf { it.clients }
 
     /**
      * Active protocols as neutral tokens, e.g. ["TCP", "UDP"]. Callers localize the
