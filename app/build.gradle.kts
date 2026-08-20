@@ -16,6 +16,13 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Which build is this? The version name never moves between debug builds, so the
+        // commit is what tells you whether the phone in your hand is up to date. CI passes
+        // it with -PgitSha; a local build says so.
+        val gitSha = (project.findProperty("gitSha") as String?)?.take(7) ?: "local"
+        buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
+        buildConfigField("String", "RELEASES_URL", "\"https://github.com/CROCDC/Oshun/releases/tag/debug-latest\"")
     }
 
     buildTypes {
@@ -43,6 +50,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {

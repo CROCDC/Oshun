@@ -8,6 +8,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.oshun.gpsbridge.net.NetworkRequirements
 import com.oshun.gpsbridge.core.StopReason
 import com.oshun.gpsbridge.store.ConfigStore
 import org.junit.After
@@ -30,6 +31,7 @@ class IdleStopBannerTest {
         @BeforeClass
         @JvmStatic
         fun recordAnIdleShutdown() {
+            NetworkGate.stateProvider = { NetworkRequirements(hotspotUp = true, wifiOff = true) }
             ConfigStore.saveStopReason(
                 InstrumentationRegistry.getInstrumentation().targetContext,
                 StopReason.IDLE_TIMEOUT,

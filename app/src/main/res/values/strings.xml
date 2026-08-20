@@ -10,9 +10,15 @@
     <string name="label_interval">Intervalo de actualización</string>
     <string name="switch_autooff">Apagado automático sin clientes (15 min)</string>
     <string name="switch_rawlog">Registrar cada posición en un CSV</string>
-    <string name="net_none_title">Sin red local</string>
-    <string name="net_none_body">La tablet no te va a encontrar. Prendé el hotspot del teléfono (o conectate a una Wi-Fi) para poder transmitir.</string>
-    <string name="net_open_hotspot">Abrir configuración de hotspot</string>
+    <string name="net_req_title">Requisitos de red</string>
+    <string name="net_req_body">El puente solo transmite sobre el hotspot del teléfono. En la amarra el Wi-Fi del club alcanza a los dos aparatos y parece que anda, pero a los pocos metros te quedás sin red y la carta se congela. El hotspot es el único enlace que zarpa con vos.</string>
+    <string name="net_req_hotspot">Hotspot del teléfono encendido</string>
+    <string name="net_req_wifi_off">Wi-Fi del teléfono apagado</string>
+    <!-- %1$s: el requisito -->
+    <string name="net_req_ok">✓ %1$s</string>
+    <string name="net_req_missing">✗ %1$s</string>
+    <string name="net_open_hotspot">Abrir hotspot</string>
+    <string name="net_open_wifi">Abrir Wi-Fi</string>
     <string name="action_start">Iniciar transmisión</string>
     <string name="action_stop">Detener</string>
 
@@ -88,6 +94,13 @@
     <!-- Instructions card -->
     <string name="instructions_title">En la tablet (Navionics)</string>
     <string name="instructions_body">1. Conecta la tablet a la misma red Wi-Fi que este teléfono (o al hotspot del teléfono).\n2. Navionics → Menú → Paired Devices → Add device manually.\n3. Host/IP = la IP de arriba, Port = el puerto, Protocol = TCP o UDP.\n4. Guarda: la posición del teléfono aparece en la carta.</string>
+
+    <!-- Versión -->
+    <string name="version_title">Versión instalada</string>
+    <!-- %1$s: versión, %2$s: commit -->
+    <string name="version_value">v%1$s · build %2$s</string>
+    <string name="version_hint">Cada build verde publica un APK nuevo en GitHub Releases. Comparalo con el commit de arriba para saber si estás al día.</string>
+    <string name="version_download">Descargar la última versión</string>
 
     <!-- Crash screen -->
     <string name="crash_title">La app se cerró de forma inesperada</string>
