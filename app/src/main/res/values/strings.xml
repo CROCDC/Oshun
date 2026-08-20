@@ -36,6 +36,7 @@
     <!-- %1$s: "12 s", "3 min 07 s", "1 h 04 min" -->
     <string name="status_age">hace %1$s</string>
     <string name="status_delivery">Entrega</string>
+    <string name="status_simulated">MODO PRUEBA: la posición es simulada, no es la tuya.</string>
 
     <!-- Resultado de cada envío -->
     <string name="outcome_ok">Entregado a un cliente</string>
@@ -55,6 +56,11 @@
     <string name="battery_banner_title">Optimización de batería activada</string>
     <string name="battery_banner_body">Android puede frenar la app con la pantalla apagada.</string>
     <string name="battery_banner_action">Excluir a Oshun</string>
+
+    <!-- Modo prueba -->
+    <string name="sim_title">Modo prueba</string>
+    <string name="sim_body">Transmite un barco simulado navegando en el Río de la Plata entre dos puntos separados 12 M, a 4 nudos (3 h por tramo, ida y vuelta). Sirve para probar Navionics de punta a punta sin salir al agua. Lo que sale por la red es idéntico a una navegación real: el aviso está acá, en el registro y en la notificación.</string>
+    <string name="switch_sim">Transmitir barco simulado</string>
 
     <!-- Registro -->
     <string name="log_open">Ver registro</string>
@@ -77,6 +83,7 @@
     <string name="log_client_disconnected">Cliente desconectado: %1$s</string>
     <string name="log_fix_ok">GPS al día</string>
     <string name="log_fix_stale">Fix viejo: se transmite como inválido</string>
+    <string name="log_simulation">MODO PRUEBA: barco simulado, la posición no es real</string>
 
     <!-- Instructions card -->
     <string name="instructions_title">En la tablet (Navionics)</string>
@@ -96,6 +103,7 @@
 
     <!-- Foreground-service notification -->
     <string name="notif_title">Oshun GPS Bridge activo</string>
+    <string name="notif_title_simulated">Oshun — MODO PRUEBA (posición simulada)</string>
     <string name="notif_channel_name">Oshun GPS Bridge</string>
     <string name="notif_channel_desc">Transmisión de GPS por NMEA a Navionics</string>
     <string name="notif_protocols_none">—</string>

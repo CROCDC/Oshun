@@ -80,6 +80,13 @@ class TrackLogFormatterTest {
         assertTrue(header.contains("transports=TCP"))
         assertTrue(header.contains("interval=1000ms"))
         assertTrue(header.contains("autooff=on"))
+        assertTrue("a shared log must say the track was real", header.contains("source=gps"))
+    }
+
+    @Test
+    fun sessionHeaderMarksASimulatedRun() {
+        val header = TrackLogFormatter.sessionHeader(now, BridgeConfig(simulated = true))
+        assertTrue(header.contains("source=simulated"))
     }
 
     @Test

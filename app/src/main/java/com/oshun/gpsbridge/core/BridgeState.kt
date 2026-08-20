@@ -17,6 +17,8 @@ data class BridgeConfig(
     val autoOffEnabled: Boolean = true,
     /** Per-fix CSV on disk. On by default: the whole point is to have it when it fails. */
     val rawLogEnabled: Boolean = true,
+    /** Test mode: transmit the simulated Río de la Plata track instead of the phone's GPS. */
+    val simulated: Boolean = false,
 )
 
 /** Live status published by the foreground service and observed by the UI. */
@@ -39,6 +41,8 @@ data class BridgeStatus(
     val fixValid: Boolean = false,
     /** What became of the last batch: delivered, sent to nobody, backed up, blind (UDP). */
     val outcome: DeliveryOutcome? = null,
+    /** True while the transmitted position is the simulator's, not the phone's. */
+    val simulated: Boolean = false,
     /** Sentences emitted as heartbeat (a resend of the last fix), included in [sentencesSent]. */
     val heartbeatsSent: Long = 0,
     val batteryPercent: Int? = null,

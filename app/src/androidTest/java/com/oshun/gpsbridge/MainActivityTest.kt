@@ -8,6 +8,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
@@ -134,6 +135,15 @@ class MainActivityTest {
     fun autoOffSwitchTogglesWithoutBlockingStart() {
         compose.onNodeWithTag("switch_autooff").performClick() // off
         compose.onNodeWithTag("switch_autooff").performClick() // back on
+        compose.onNodeWithTag("action_button").assertIsEnabled()
+    }
+
+    @Test
+    fun testModeCanBeToggledAndIsOffByDefault() {
+        // It lives below the action button on purpose: opt-in, and never in the way of Start.
+        compose.onNodeWithText(str(R.string.sim_title)).assertExists()
+        compose.onNodeWithTag("switch_sim").performScrollTo().performClick()
+        compose.onNodeWithTag("switch_sim").performScrollTo().performClick()
         compose.onNodeWithTag("action_button").assertIsEnabled()
     }
 

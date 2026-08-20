@@ -16,6 +16,7 @@ class ConfigCodecTest {
             intervalMillis = 500L,
             autoOffEnabled = false,
             rawLogEnabled = false,
+            simulated = true,
         )
         assertEquals(config, ConfigCodec.decode(ConfigCodec.encode(config)))
     }
@@ -76,6 +77,9 @@ class ConfigCodecTest {
         assertFalse(ConfigCodec.decode("rawlog=0").rawLogEnabled)
         assertTrue(ConfigCodec.decode("rawlog=1").rawLogEnabled)
         assertTrue(ConfigCodec.decode("rawlog=maybe").rawLogEnabled)
+        assertTrue(ConfigCodec.decode("sim=1").simulated)
+        assertFalse(ConfigCodec.decode("sim=0").simulated)
+        assertFalse("a garbled flag must not start a simulation", ConfigCodec.decode("sim=maybe").simulated)
         // Unparseable booleans keep the default rather than flipping silently.
         assertTrue(ConfigCodec.decode("tcp=maybe").tcpEnabled)
         assertTrue(ConfigCodec.decode("autooff=maybe").autoOffEnabled)
