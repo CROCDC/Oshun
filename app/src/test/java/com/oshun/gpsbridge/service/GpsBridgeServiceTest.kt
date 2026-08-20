@@ -124,6 +124,19 @@ class GpsBridgeServiceTest {
 
     private fun trackFile(): File = File(File(RuntimeEnvironment.getApplication().filesDir, "logs"), "track.csv")
 
+    /**
+     * The client count is published by the accept thread just after the socket joins the
+     * list, so a sentence can reach the client a hair before the state catches up. Wait for
+     * it rather than racing it.
+     */
+    private fun awaitTcpClients(expected: Int) {
+        repeat(100) {
+            if (BridgeState.status.value.tcpClients == expected) return
+            Thread.sleep(20)
+        }
+        assertEquals(expected, BridgeState.status.value.tcpClients)
+    }
+
     /** Polls the process-wide log, which several threads write to. */
     private fun awaitEvent(kind: EventKind, outcome: DeliveryOutcome? = null) {
         repeat(200) {
@@ -379,7 +392,7 @@ class GpsBridgeServiceTest {
         val client = connect(port)
         val line = BufferedReader(client.getInputStream().reader(Charsets.US_ASCII)).readLine()
         assertTrue("got the last known position: $line", line.startsWith("\$GP"))
-        assertEquals(1, BridgeState.status.value.tcpClients)
+        awaitTcpClients(1)
 
         client.close()
         stop(service)
