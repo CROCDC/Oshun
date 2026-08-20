@@ -41,6 +41,10 @@ jobs:
       - name: App unit coverage report
         run: ./gradlew :app:jacocoMergedReport
 
+      - name: Failing tests
+        if: failure()
+        run: python3 ci/failing_tests.py app/build/test-results verify/build/test-results
+
       - name: Coverage summary
         if: always()
         run: |
@@ -97,6 +101,13 @@ jobs:
             # this the "merged" report only ever covered the emulator run.
             ./gradlew testDebugUnitTest
             ./gradlew jacocoMergedReport
+
+      - name: Failing tests
+        if: failure()
+        run: |
+          python3 ci/failing_tests.py \
+            app/build/test-results \
+            app/build/outputs/androidTest-results
 
       - name: Coverage summary (merged unit + instrumented)
         if: always()

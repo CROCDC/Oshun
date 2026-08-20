@@ -58,6 +58,10 @@ class GpsBridgeServiceTest {
     fun tearDown() {
         controllers.forEach { runCatching { it.destroy() } }
         controllers.clear()
+        // The idle watchdog posts its shutdown to the main looper. Robolectric runs those
+        // only when idled, so drain them here — otherwise a stale one lands mid-test and
+        // resets the process-wide BridgeState under the next test's feet.
+        shadowOf(Looper.getMainLooper()).idle()
         GpsBridgeService.fixProviderFactory = { LocationSource(it) }
         GpsBridgeService.autoOffMillis = defaultAutoOffMillis
         ConfigStore.saveStopReason(RuntimeEnvironment.getApplication(), null)
@@ -189,7 +193,7 @@ class GpsBridgeServiceTest {
 
         val service = startService(port, tcp = true, udp = true)
 
-        assertTrue("service marked running", BridgeState.status.value.running)
+        awaitRunning(true)
         assertTrue("tcp enabled", BridgeState.status.value.tcpEnabled)
 
         val client = connect(port)
@@ -208,7 +212,7 @@ class GpsBridgeServiceTest {
 
         val service = startService(port, tcp = false, udp = true)
 
-        assertTrue(BridgeState.status.value.running)
+        awaitRunning(true)
         assertFalse("tcp disabled", BridgeState.status.value.tcpEnabled)
         assertTrue("udp enabled", BridgeState.status.value.udpEnabled)
 
@@ -451,6 +455,7 @@ class GpsBridgeServiceTest {
         }
 
         val service = startService(port, tcp = true, udp = false, simulated = true)
+        awaitRunning(true)
         assertTrue("the session is marked as simulated", BridgeState.status.value.simulated)
         awaitEvent(EventKind.SIMULATION)
 
