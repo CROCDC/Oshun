@@ -186,7 +186,7 @@ Tres niveles de test:
    ```
 
 **Cobertura mergeada del módulo app** (unit + instrumentado), medida por CI en cada
-push: **82% instrucciones / 85% líneas**. El task `jacocoMergedReport` une las dos
+push: **81% instrucciones / 84% líneas**. El task `jacocoMergedReport` une las dos
 ejecuciones, y para que ese número signifique algo el job del emulador corre también
 los unitarios antes de generarlo (los dos jobs viven en runners distintos, así que
 de lo contrario el reporte "mergeado" solo veía la mitad). Cada push imprime los
@@ -206,7 +206,7 @@ de batería, opcional: solo se usa cuando tocás el botón del banner).
 
 - [x] Core NMEA (RMC/GGA + checksum) con tests que pasan
 - [x] Transportes TCP y UDP con tests (sockets reales en loopback)
-- [x] Cobertura del core 97% con gate del 90% en CI; app mergeada 82% instrucciones / 85% líneas
+- [x] Cobertura del core 97% con gate del 90% en CI; app mergeada 81% instrucciones / 84% líneas
 - [x] Foreground service + UI
 - [x] Intervalo de actualización del GPS configurable (0.5 / 1 / 2 / 5 s)
 - [x] Lectura de consumo de batería (nivel %, mA instantáneos, caída %/h)
