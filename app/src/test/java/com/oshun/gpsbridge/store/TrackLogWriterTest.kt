@@ -106,7 +106,7 @@ class TrackLogWriterTest {
     }
 
     @Test
-    fun shareBuildsOneFileWithTheWholeHistory() {
+    fun shareBuildsOneFileFromBothKeptFiles() {
         TrackLogWriter.maxBytes = 200L
         TrackLogWriter.open(context, "# session")
         repeat(20) { TrackLogWriter.append(context, "row-$it-padding-padding-padding") }
@@ -116,7 +116,12 @@ class TrackLogWriterTest {
         assertNotNull(uri)
         val shared = File(File(context.cacheDir, "logs"), "oshun-track.csv")
         assertEquals(previousFile().length() + currentFile().length(), shared.length())
-        assertTrue(shared.readLines().any { it.startsWith("row-0") })
+
+        val sharedLines = shared.readLines()
+        assertTrue("the newest rows are there", sharedLines.any { it.startsWith("row-19") })
+        // Both kept files, not just the live one. Anything older than the rotated file is
+        // gone on purpose — that is what a two-file rotation is for.
+        assertTrue("the rotated file is included too", sharedLines.size > currentFile().readLines().size)
     }
 
     @Test
