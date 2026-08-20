@@ -41,6 +41,10 @@ jobs:
       - name: App unit coverage report
         run: ./gradlew :app:jacocoMergedReport
 
+      - name: Failing tests
+        if: failure()
+        run: python3 ci/failing_tests.py app/build/test-results verify/build/test-results
+
       - name: Coverage summary
         if: always()
         run: |
@@ -98,6 +102,13 @@ jobs:
             ./gradlew testDebugUnitTest
             ./gradlew jacocoMergedReport
 
+      - name: Failing tests
+        if: failure()
+        run: |
+          python3 ci/failing_tests.py \
+            app/build/test-results \
+            app/build/outputs/androidTest-results
+
       - name: Coverage summary (merged unit + instrumented)
         if: always()
         run: python3 ci/coverage_summary.py app/build/reports/jacoco/merged.xml "App (merged)"
@@ -139,7 +150,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug -PgitSha=${{ github.sha }}
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4

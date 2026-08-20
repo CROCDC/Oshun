@@ -13,6 +13,10 @@ la reconoce como una fuente de posición externa (igual que un gateway NMEA de b
 
 En el teléfono, la primera vez hay que permitir "instalar apps de orígenes desconocidos".
 
+La app misma muestra abajo de todo qué build tenés instalado (versión + commit) y un botón
+**Descargar la última versión** que abre esa página de Releases, así podés comparar sin
+salir a buscar.
+
 ## Cómo funciona
 
 ```
@@ -23,8 +27,34 @@ Teléfono (esta app)                         Tablet (Navionics)
                                                 Protocol = TCP o UDP
 ```
 
-Ambos dispositivos deben estar en la **misma red Wi‑Fi** (o la tablet conectada
-al **hotspot** del teléfono).
+La tablet se conecta al **hotspot del teléfono**. La app **no arranca** sobre una Wi‑Fi
+ajena, y eso es a propósito: ver [Requisito de red](#requisito-de-red-el-hotspot-no-es-opcional).
+
+## Requisito de red: el hotspot no es opcional
+
+El puente **solo transmite sobre el hotspot del teléfono**. Mientras no se cumplan las dos
+condiciones, el botón Iniciar queda deshabilitado:
+
+- ✓ **Hotspot del teléfono encendido**
+- ✓ **Wi‑Fi del teléfono apagado**
+
+El motivo es una falla real: en la amarra, el Wi‑Fi del club llega a los dos aparatos, el
+emparejamiento funciona y todo parece andar — hasta que zarpás y a los pocos metros el
+teléfono se va de esa red. La IP que la app había mostrado deja de significar nada, la
+tablet pierde al teléfono y la carta se congela sin que ninguno de los dos avise. El
+hotspot es el único enlace que zarpa con vos.
+
+Además, la IP que muestra la app es **la del hotspot**, no la de cualquier interfaz que
+aparezca primero: antes podía mostrarte la de la Wi‑Fi (o incluso una de la red celular)
+mientras la tablet estaba del otro lado.
+
+**Única excepción: el modo prueba.** Con el barco simulado encendido alcanza con que los
+dos aparatos estén en la misma red (la de tu casa, por ejemplo), porque esa corrida no sale
+del escritorio. En navegación real el simulador está apagado, así que ahí la regla sigue
+siendo dura.
+
+> Si algún día navegás con un router propio a bordo, esta restricción te va a estorbar:
+> avisame y agregamos una excepción explícita para ese caso.
 
 ## Dos transportes (elegís cuál usar)
 
@@ -37,8 +67,9 @@ La app puede emitir por los dos a la vez; después probás cuál te funciona mej
 
 ## Emparejar en la tablet
 
-1. Conectá la tablet a la misma Wi‑Fi que el teléfono (o al hotspot del teléfono).
-2. Abrí la app en el teléfono, elegí TCP/UDP y puerto, y tocá **Iniciar**. Anotá la **IP** que muestra.
+1. Prendé el **hotspot** del teléfono y **apagá su Wi‑Fi**; conectá la tablet a ese hotspot.
+2. Abrí la app en el teléfono, elegí TCP/UDP y puerto, y tocá **Iniciar**. Anotá la **IP** que muestra
+   (es la del hotspot).
 3. En Navionics: **Menú → Paired Devices → Add device manually**.
 4. Ingresá **Host = IP del teléfono**, **Port = 2000**, **Protocol = TCP** (o UDP) y guardá.
 5. La posición del teléfono aparece y se mueve en la carta.
@@ -245,6 +276,8 @@ de batería, opcional: solo se usa cuando tocás el botón del banner).
 - [x] Registro de sesión en la app + CSV rotativo de cada posición, con el resultado de cada envío
 - [x] Sockets no bloqueantes: se distingue "no había nadie" de "mandé y no lo consumieron"
 - [x] Modo prueba: barco simulado a 4 nudos entre dos waypoints a 12 M, para probar Navionics en seco
+- [x] Requisito de hotspot: no se puede transmitir sobre una Wi‑Fi ajena, y la IP mostrada es la del hotspot
+- [x] La app muestra su build (versión + commit) y enlaza a la última versión publicada
 - [x] Código en inglés; todos los textos de UI en `res/values/strings.xml`
 - [x] CI que compila el APK y lo publica como artifact
 - [ ] Prueba de campo real contra Navionics (pendiente de hardware)

@@ -54,7 +54,7 @@ import com.oshun.gpsbridge.core.BridgeStatus
 import com.oshun.gpsbridge.crash.CrashActivity
 import com.oshun.gpsbridge.crash.CrashStore
 import com.oshun.gpsbridge.core.StopReason
-import com.oshun.gpsbridge.net.NetworkUtils
+import com.oshun.gpsbridge.net.NetworkRequirements
 import com.oshun.gpsbridge.service.GpsBridgeService
 import com.oshun.gpsbridge.store.ConfigStore
 import kotlinx.coroutines.delay
@@ -92,15 +92,15 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
     // Why the bridge stopped last time; an idle shutdown is otherwise invisible.
     var lastStop by remember { mutableStateOf(ConfigStore.readStopReason(context)) }
 
-    // No local IPv4 means neither Wi-Fi nor the hotspot is up, so the tablet can't
-    // reach us. Poll so the banner clears as soon as the user turns the hotspot on.
-    var hasNetwork by remember { mutableStateOf(NetworkUtils.localIpAddress() != null) }
+    // The bridge only transmits over the phone's own hotspot. Poll so the requirements
+    // clear the moment the user turns it on.
+    var network by remember { mutableStateOf(NetworkGate.state(context)) }
     // Drives the "hace N s" counters, so a stalled bridge is visible without touching anything.
     var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
     var batteryUnrestricted by remember { mutableStateOf(isIgnoringBatteryOptimizations(context)) }
     LaunchedEffect(Unit) {
         while (true) {
-            hasNetwork = NetworkUtils.localIpAddress() != null
+            network = NetworkGate.state(context)
             nowMillis = System.currentTimeMillis()
             batteryUnrestricted = isIgnoringBatteryOptimizations(context)
             delay(1000)
@@ -162,8 +162,13 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
             )
         }
 
-        if (!hasNetwork) {
-            NoNetworkBanner(onOpenHotspot = { openHotspotSettings(context) })
+        if (!network.metFor(simulated)) {
+            NetworkRequirementsCard(
+                network = network,
+                simulated = simulated,
+                onOpenHotspot = { openHotspotSettings(context) },
+                onOpenWifi = { openWifiSettings(context) },
+            )
         }
 
         OutlinedTextField(
@@ -200,7 +205,7 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
         if (!status.running) {
             Button(
                 onClick = { permissionLauncher.launch(requiredPermissions) },
-                enabled = (tcpEnabled || udpEnabled) && hasNetwork,
+                enabled = (tcpEnabled || udpEnabled) && network.metFor(simulated),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("action_button"),
@@ -243,6 +248,8 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
         if (status.running) StatusCard(status, nowMillis)
 
         InstructionsCard()
+
+        VersionCard(onDownload = { openReleases(context) })
     }
 }
 
@@ -290,14 +297,87 @@ private fun formatInterval(millis: Long): String {
     return "$text s"
 }
 
+/**
+ * The pre-flight check. Transmitting over the marina's Wi-Fi looks fine at the mooring and
+ * dies a few metres out, so the bridge will not start until the phone is serving its own
+ * hotspot — the only link that casts off with the boat.
+ */
 @Composable
-private fun NoNetworkBanner(onOpenHotspot: () -> Unit) {
+private fun NetworkRequirementsCard(
+    network: NetworkRequirements,
+    simulated: Boolean,
+    onOpenHotspot: () -> Unit,
+    onOpenWifi: () -> Unit,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.net_none_title), style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(R.string.net_none_body), style = MaterialTheme.typography.bodyMedium)
-            Button(onClick = onOpenHotspot) { Text(stringResource(R.string.net_open_hotspot)) }
+            Text(stringResource(R.string.net_req_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(if (simulated) R.string.net_req_body_sim else R.string.net_req_body),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+
+            if (simulated) {
+                // A simulated run never leaves the desk: any network both devices share works.
+                RequirementRow(
+                    met = network.anyLocalNetwork,
+                    label = stringResource(R.string.net_req_any),
+                    actionLabel = stringResource(R.string.net_open_hotspot),
+                    tag = "fix_hotspot",
+                    onFix = onOpenHotspot,
+                )
+            } else {
+                RequirementRow(
+                    met = network.hotspotUp,
+                    label = stringResource(R.string.net_req_hotspot),
+                    actionLabel = stringResource(R.string.net_open_hotspot),
+                    tag = "fix_hotspot",
+                    onFix = onOpenHotspot,
+                )
+                RequirementRow(
+                    met = network.wifiOff,
+                    label = stringResource(R.string.net_req_wifi_off),
+                    actionLabel = stringResource(R.string.net_open_wifi),
+                    tag = "fix_wifi",
+                    onFix = onOpenWifi,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun RequirementRow(
+    met: Boolean,
+    label: String,
+    actionLabel: String,
+    tag: String,
+    onFix: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            stringResource(if (met) R.string.net_req_ok else R.string.net_req_missing, label),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+        if (!met) {
+            Button(onClick = onFix, modifier = Modifier.testTag(tag)) { Text(actionLabel) }
+        }
+    }
+}
+
+/** Opens the Wi-Fi settings so the client radio can be turned off. */
+private fun openWifiSettings(context: Context) {
+    try {
+        context.startActivity(
+            Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    } catch (e: Exception) {
+        openHotspotSettings(context) // the wireless screen is the next best thing
     }
 }
 
@@ -448,6 +528,43 @@ private fun StatusCard(status: BridgeStatus, nowMillis: Long) {
 private fun ageLabel(nowMillis: Long, thenMillis: Long?): String {
     val token = BridgeLogic.ageToken(nowMillis, thenMillis) ?: return stringResource(R.string.status_never)
     return stringResource(R.string.status_age, token)
+}
+
+/**
+ * The app is sideloaded, so nothing tells you a newer build exists — and the version name
+ * does not move between debug builds. The commit does, so it is what gets shown.
+ */
+@Composable
+private fun VersionCard(onDownload: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.version_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.version_value, BuildConfig.VERSION_NAME, BuildConfig.GIT_SHA),
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Monospace,
+            )
+            Text(stringResource(R.string.version_hint), style = MaterialTheme.typography.bodyMedium)
+            OutlinedButton(
+                onClick = onDownload,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("download_update"),
+            ) { Text(stringResource(R.string.version_download)) }
+        }
+    }
+}
+
+/** Opens the Releases page, where every green build publishes a fresh APK. */
+private fun openReleases(context: Context) {
+    try {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(BuildConfig.RELEASES_URL))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    } catch (e: Exception) {
+        // No browser to handle it: nothing useful to do, and never worth crashing over.
+    }
 }
 
 @Composable
