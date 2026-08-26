@@ -1,13 +1,49 @@
 package com.oshun.gpsbridge.net
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NetworkRequirementsTest {
 
     @Test
-    fun realNavigationDemandsTheHotspotAndNothingElse() {
+    fun aCableIsEnoughOnItsOwn() {
+        // The address it advertises exists only on that cable, so nothing the radios do can
+        // point the tablet somewhere else — not even a Wi-Fi left on by mistake.
+        val cabled = NetworkRequirements(hotspotUp = false, wifiOff = false, cableUp = true)
+        assertTrue(cabled.metFor(simulated = false))
+        assertTrue(cabled.metFor(simulated = true))
+        assertEquals(Link.CABLE, cabled.link)
+    }
+
+    @Test
+    fun theCablePreemptsTheHotspot() {
+        val both = NetworkRequirements(
+            hotspotUp = true,
+            wifiOff = true,
+            cableUp = true,
+            address = "192.168.42.129",
+        )
+        assertEquals(Link.CABLE, both.link)
+    }
+
+    @Test
+    fun namesTheLinkItIsAbout() {
+        assertEquals(
+            Link.HOTSPOT,
+            NetworkRequirements(hotspotUp = true, wifiOff = true, address = "192.168.43.1").link,
+        )
+        assertEquals(
+            Link.OTHER,
+            NetworkRequirements(hotspotUp = false, wifiOff = false, address = "192.168.1.37").link,
+        )
+        assertNull(NetworkRequirements(hotspotUp = false, wifiOff = true).link)
+    }
+
+    @Test
+    fun withoutACableRealNavigationStillDemandsTheHotspotAndNothingElse() {
         assertTrue(NetworkRequirements(hotspotUp = true, wifiOff = true).metFor(simulated = false))
         assertFalse("no hotspot", NetworkRequirements(hotspotUp = false, wifiOff = true).metFor(simulated = false))
         assertFalse("wifi still on", NetworkRequirements(hotspotUp = true, wifiOff = false).metFor(simulated = false))

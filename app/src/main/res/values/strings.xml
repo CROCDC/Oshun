@@ -11,7 +11,10 @@
     <string name="switch_autooff">Apagado automático sin clientes (15 min)</string>
     <string name="switch_rawlog">Registrar cada posición en un CSV</string>
     <string name="net_req_title">Requisitos de red</string>
-    <string name="net_req_body">El puente solo transmite sobre el hotspot del teléfono. En la amarra el Wi-Fi del club alcanza a los dos aparatos y parece que anda, pero a los pocos metros te quedás sin red y la carta se congela. El hotspot es el único enlace que zarpa con vos.</string>
+    <string name="net_req_body">El puente solo transmite sobre un enlace que zarpa con vos: el cable USB entre el teléfono y la tablet, o el hotspot del teléfono. En la amarra el Wi-Fi del club alcanza a los dos aparatos y parece que anda, pero a los pocos metros te quedás sin red y la carta se congela.</string>
+    <string name="net_req_cable">Cable USB entre el teléfono y la tablet</string>
+    <string name="net_req_or">— o, si no hay cable —</string>
+    <string name="net_req_cable_hint">Con el cable puesto, prendé «Anclaje por USB» en el teléfono. Si la tablet no lo reconoce, no todas lo hacen: usá el hotspot.</string>
     <string name="net_req_body_sim">En modo prueba alcanza con que el teléfono y la tablet estén en la misma red: la corrida no sale del escritorio. Prendé el hotspot o conectate a una Wi-Fi.</string>
     <string name="net_req_any">Alguna red local disponible</string>
     <string name="net_req_hotspot">Hotspot del teléfono encendido</string>
@@ -21,12 +24,17 @@
     <string name="net_req_missing">✗ %1$s</string>
     <string name="net_open_hotspot">Abrir hotspot</string>
     <string name="net_open_wifi">Abrir Wi-Fi</string>
+    <string name="net_open_usb">Abrir anclaje USB</string>
     <string name="action_start">Iniciar transmisión</string>
     <string name="action_stop">Detener</string>
 
     <!-- Status card -->
     <string name="status_title">Transmitiendo</string>
     <string name="status_ip">IP del teléfono</string>
+    <string name="status_link">Enlace</string>
+    <string name="link_cable">cable USB</string>
+    <string name="link_hotspot">hotspot del teléfono</string>
+    <string name="link_other">red ajena (no zarpa con vos)</string>
     <string name="status_no_wifi">sin Wi-Fi</string>
     <string name="status_port">Puerto</string>
     <string name="status_protocols">Protocolos</string>
@@ -95,7 +103,7 @@
 
     <!-- Instructions card -->
     <string name="instructions_title">En la tablet (Navionics)</string>
-    <string name="instructions_body">1. Conecta la tablet a la misma red Wi-Fi que este teléfono (o al hotspot del teléfono).\n2. Navionics → Menú → Paired Devices → Add device manually.\n3. Host/IP = la IP de arriba, Port = el puerto, Protocol = TCP o UDP.\n4. Guarda: la posición del teléfono aparece en la carta.</string>
+    <string name="instructions_body">1. Enlazá los aparatos: cable USB con «Anclaje por USB» prendido en el teléfono, o la tablet conectada al hotspot del teléfono.\n2. Navionics → Menú → Paired Devices → Add device manually.\n3. Host/IP = la IP de arriba, Port = el puerto, Protocol = TCP o UDP.\n4. Guarda: la posición del teléfono aparece en la carta.</string>
 
     <!-- Versión -->
     <string name="version_title">Versión instalada</string>
