@@ -13,7 +13,10 @@ android {
         applicationId = "com.oshun.gpsbridge"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
+        // Every published build gets a higher number than the one before it: CI passes the
+        // run number with -PversionCode. Android refuses to install an older build over a
+        // newer one, which is the behaviour you want from a "latest" download.
+        versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -23,6 +26,28 @@ android {
         val gitSha = (project.findProperty("gitSha") as String?)?.take(7) ?: "local"
         buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
         buildConfigField("String", "RELEASES_URL", "\"https://github.com/CROCDC/Oshun/releases/tag/debug-latest\"")
+    }
+
+    /**
+     * A fixed signing key, kept in the repository on purpose.
+     *
+     * Without it, Gradle signs debug builds with the throwaway keystore it generates on
+     * whatever machine is building — and CI builds on a fresh machine every time, so every
+     * APK carried a different signature. Android refuses to update an app whose signature
+     * changed, which is why installing a new build over the old one always failed with a
+     * flat "app not installed" and the only way through was to uninstall first.
+     *
+     * The password is here in plain sight because this key protects nothing: it identifies
+     * a sideloaded debug build, and the store it would matter for does not exist. What it
+     * does buy is that an update installs over the previous one and keeps your settings.
+     */
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("oshun-debug.keystore")
+            storePassword = "oshun-debug"
+            keyAlias = "oshun"
+            keyPassword = "oshun-debug"
+        }
     }
 
     buildTypes {

@@ -114,8 +114,9 @@
     <!-- Versión -->
     <string name="version_title">Versión instalada</string>
     <!-- %1$s: versión, %2$s: commit -->
-    <string name="version_value">v%1$s · build %2$s</string>
-    <string name="version_hint">Cada build verde publica un APK nuevo en GitHub Releases. Comparalo con el commit de arriba para saber si estás al día.</string>
+    <!-- %1$s: versionName, %2$d: versionCode, %3$s: commit -->
+    <string name="version_value">v%1$s · build %2$d · %3$s</string>
+    <string name="version_hint">Cada build verde publica un APK nuevo en GitHub Releases. El número de build sube en cada uno: si el de Releases es mayor, estás atrasado. Se instala encima sin desinstalar.</string>
     <string name="version_download">Descargar la última versión</string>
 
     <!-- Crash screen -->

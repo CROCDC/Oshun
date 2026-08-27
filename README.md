@@ -13,9 +13,25 @@ la reconoce como una fuente de posición externa (igual que un gateway NMEA de b
 
 En el teléfono, la primera vez hay que permitir "instalar apps de orígenes desconocidos".
 
-La app misma muestra abajo de todo qué build tenés instalado (versión + commit) y un botón
-**Descargar la última versión** que abre esa página de Releases, así podés comparar sin
-salir a buscar.
+La app misma muestra abajo de todo qué build tenés instalado (versión + número de build +
+commit) y un botón **Descargar la última versión** que abre esa página de Releases, así
+podés comparar sin salir a buscar. El número de build sube en cada APK publicado: si el de
+Releases es mayor que el tuyo, estás atrasado.
+
+### Actualizar encima de la versión instalada
+
+Se instala encima, sin desinstalar. **Con una excepción: la primera vez que actualices desde
+un APK anterior al build 49 hay que desinstalar** — y ahí sí perdés la configuración
+guardada (puerto, switches). De ahí en adelante, nunca más.
+
+El motivo: hasta ese build cada APK se firmaba con una clave distinta. Gradle firma los
+builds de debug con un keystore que genera solo si no existe, y CI corre en una máquina
+nueva cada vez, así que generaba uno nuevo en cada corrida. Android **se niega a actualizar
+una app cuya firma cambió** y el instalador te lo muestra como un escueto "aplicación no
+instalada", sin decir por qué. Ahora el repo tiene un keystore fijo
+(`app/oshun-debug.keystore`), commiteado a propósito y con la contraseña a la vista: es la
+clave de una app de debug que se instala a mano, no protege nada, y lo que compra es que una
+actualización entre encima de la anterior y te respete la configuración.
 
 ## Cómo funciona
 

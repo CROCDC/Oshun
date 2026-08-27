@@ -589,7 +589,12 @@ private fun VersionCard(onDownload: () -> Unit) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.version_title), style = MaterialTheme.typography.titleMedium)
             Text(
-                stringResource(R.string.version_value, BuildConfig.VERSION_NAME, BuildConfig.GIT_SHA),
+                stringResource(
+                    R.string.version_value,
+                    BuildConfig.VERSION_NAME,
+                    BuildConfig.VERSION_CODE,
+                    BuildConfig.GIT_SHA,
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 fontFamily = FontFamily.Monospace,
             )
