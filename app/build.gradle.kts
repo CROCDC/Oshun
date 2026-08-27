@@ -86,6 +86,21 @@ android {
     }
 }
 
+/**
+ * The AIS feed's parsing tests do not run here, and that is deliberate.
+ *
+ * They exercise org.json, which lives in the Android framework — and a unit test in this
+ * module compiles against the stubbed android.jar, where `isReturnDefaultValues` makes every
+ * one of those methods hand back null. The tests would be measuring the stub, not the parser.
+ *
+ * They run for real in the `verify` module, on a plain JVM with the actual implementation,
+ * from these very same source files. Nothing is skipped; it just happens over there.
+ */
+tasks.withType<Test>().configureEach {
+    exclude("**/AisStreamMessagesTest*")
+    exclude("**/AisSubscriptionTest*")
+}
+
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
