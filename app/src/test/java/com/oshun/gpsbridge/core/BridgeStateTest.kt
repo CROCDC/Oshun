@@ -62,4 +62,38 @@ class BridgeStateTest {
         BridgeState.reset()
         assertEquals(BridgeStatus(), BridgeState.status.value)
     }
+
+    @Test
+    fun anUpdateInFlightCannotResurrectAStoppedBridge() {
+        // The interleaving that turned CI red: a sentence goes out, its update reads the
+        // status, the user stops the bridge, and the update writes its copy back over the
+        // reset — leaving the UI reporting a session that no longer exists. Doing the reset
+        // inside the transform makes that exact ordering deterministic instead of a race.
+        BridgeState.update { it.copy(running = true, sentencesSent = 10) }
+
+        BridgeState.update { status ->
+            BridgeState.reset()
+            status.copy(sentencesSent = status.sentencesSent + 1)
+        }
+
+        assertFalse("the stop must win", BridgeState.status.value.running)
+    }
+
+    @Test
+    fun concurrentUpdatesDoNotLoseEachOther() {
+        // Different threads own different fields; a read-modify-write drops one of them.
+        val threads = (0 until 4).map { worker ->
+            Thread {
+                repeat(500) {
+                    if (worker % 2 == 0) BridgeState.update { s -> s.copy(sentencesSent = s.sentencesSent + 1) }
+                    else BridgeState.update { s -> s.copy(heartbeatsSent = s.heartbeatsSent + 1) }
+                }
+            }
+        }
+        threads.forEach { it.start() }
+        threads.forEach { it.join() }
+
+        assertEquals(1000L, BridgeState.status.value.sentencesSent)
+        assertEquals(1000L, BridgeState.status.value.heartbeatsSent)
+    }
 }
