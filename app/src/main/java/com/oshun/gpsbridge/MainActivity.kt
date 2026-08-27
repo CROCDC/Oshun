@@ -443,11 +443,6 @@ private fun openHotspotSettings(context: Context) {
 }
 
 /**
- * Test mode: a simulated boat instead of the phone's GPS. Called out loudly, because a
- * chart plotter showing a position that is not yours is worse than one showing none.
- */
-@Composable
-/**
  * The internet AIS feed: opt in, and say plainly what it is not.
  *
  * The warning is not decoration. Targets arrive delayed, only vessels that transmit AIS are
@@ -491,6 +486,10 @@ private fun AisFeedCard(
     }
 }
 
+/**
+ * Test mode: a simulated boat instead of the phone's GPS. Called out loudly, because a
+ * chart plotter showing a position that is not yours is worse than one showing none.
+ */
 @Composable
 private fun TestModeCard(enabled: Boolean, editable: Boolean, onChange: (Boolean) -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
