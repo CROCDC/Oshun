@@ -1,5 +1,6 @@
 package com.oshun.gpsbridge.core
 
+import com.oshun.gpsbridge.model.AisTarget
 import com.oshun.gpsbridge.model.Fix
 import com.oshun.gpsbridge.net.NmeaTcpServer
 import com.oshun.gpsbridge.net.NmeaUdpBroadcaster
@@ -198,5 +199,42 @@ class BridgeLogicTest {
     fun ageTokenClampsClockSkewToZero() {
         // System.currentTimeMillis() can step backwards; never render a negative age.
         assertEquals("0 s", BridgeLogic.ageToken(1_000L, 5_000L))
+    }
+
+    @Test
+    fun aisPositionsGoOutOnTheirOwnSlowerClock() {
+        // Repeating every target with every fix would triple the traffic to say nothing new.
+        val now = 100_000L
+        assertTrue("nothing sent yet", BridgeLogic.shouldEmitAgain(now, 0L, BridgeLogic.AIS_POSITION_INTERVAL_MILLIS))
+        assertFalse(BridgeLogic.shouldEmitAgain(now, now - 1_000L, BridgeLogic.AIS_POSITION_INTERVAL_MILLIS))
+        assertTrue(
+            BridgeLogic.shouldEmitAgain(now, now - BridgeLogic.AIS_POSITION_INTERVAL_MILLIS, BridgeLogic.AIS_POSITION_INTERVAL_MILLIS),
+        )
+        assertTrue(
+            "names go out far more rarely than positions",
+            BridgeLogic.AIS_STATIC_INTERVAL_MILLIS > BridgeLogic.AIS_POSITION_INTERVAL_MILLIS,
+        )
+    }
+
+    @Test
+    fun aBatchCarriesTheNamesOnlyWhenTheyAreDue() {
+        val target = AisTarget(
+            mmsi = 701999001,
+            name = "TEST CARGO",
+            latitude = -34.9,
+            longitude = -57.4,
+            speedKnots = 10.0,
+            courseDegrees = 90.0,
+        )
+        val withNames = BridgeLogic.aisSentencesFor(listOf(target), NOW, withNames = true)
+        val positionsOnly = BridgeLogic.aisSentencesFor(listOf(target), NOW, withNames = false)
+        assertEquals(2, withNames.size)
+        assertEquals(1, positionsOnly.size)
+        assertTrue(positionsOnly.single().startsWith("!AIVDM"))
+        assertTrue(BridgeLogic.aisSentencesFor(emptyList(), NOW, withNames = true).isEmpty())
+    }
+
+    private companion object {
+        const val NOW = 1787229296000L
     }
 }

@@ -434,6 +434,7 @@ private fun TestModeCard(enabled: Boolean, editable: Boolean, onChange: (Boolean
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.sim_title), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.sim_body), style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.sim_ais), style = MaterialTheme.typography.bodyMedium)
             SwitchRow(stringResource(R.string.switch_sim), "switch_sim", enabled, editable, onChange)
         }
     }
@@ -520,6 +521,9 @@ private fun StatusCard(status: BridgeStatus, link: Link?, nowMillis: Long) {
             }
             KeyValue(stringResource(R.string.status_ip), status.ipAddress ?: stringResource(R.string.status_no_wifi))
             link?.let { KeyValue(stringResource(R.string.status_link), linkText(it)) }
+            if (status.aisTargets > 0) {
+                KeyValue(stringResource(R.string.status_ais), status.aisTargets.toString())
+            }
             KeyValue(stringResource(R.string.status_port), status.port.toString())
             val protocols = BridgeLogic.enabledProtocols(status)
                 .joinToString(" + ")

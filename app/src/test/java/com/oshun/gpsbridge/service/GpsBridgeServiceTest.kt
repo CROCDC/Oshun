@@ -447,6 +447,64 @@ class GpsBridgeServiceTest {
     }
 
     @Test
+    fun testModeAlsoTransmitsTheSimulatedAisTraffic() {
+        // A plotter takes other vessels on the same stream as your own position, so the proof
+        // that has to exist is the one over a real socket: AIVDM lines interleaved with the
+        // GPRMC, positions and names both.
+        val port = freePort()
+        GpsBridgeService.fixProviderFactory = {
+            throw IllegalStateException("test mode must not touch the phone's GPS")
+        }
+
+        val service = startService(port, tcp = true, udp = false, simulated = true)
+        awaitRunning(true)
+
+        val client = connect(port)
+        val reader = BufferedReader(client.getInputStream().reader(Charsets.US_ASCII))
+        val ais = buildList {
+            repeat(MAX_LINES_READ) {
+                val line = reader.readLine() ?: return@repeat
+                if (line.startsWith("!AIVDM")) add(line)
+                if (size >= 4) return@buildList
+            }
+        }
+
+        val payloads = ais.map { it.split(",")[5] }
+        // '1' is a class A position report and 'H' a static message: the first six bits of the
+        // payload are the message type, so the type is legible without decoding the rest.
+        assertEquals("two vessels reporting their position", 2, payloads.count { it.startsWith("1") })
+        assertEquals("two vessels naming themselves", 2, payloads.count { it.startsWith("H") })
+        assertEquals("the same two targets the status card counts", 2, BridgeState.status.value.aisTargets)
+
+        client.close()
+        stop(service)
+        awaitRunning(false)
+    }
+
+    @Test
+    fun aRealNavigationCarriesNoSimulatedTraffic() {
+        // Inventing vessels on a live chart is the one failure this feature could cause, so
+        // the guard gets its own test rather than being a line nobody exercises.
+        val port = freePort()
+        GpsBridgeService.fixProviderFactory = { fakeProvider(sampleFix) }
+
+        val service = startService(port, tcp = true, udp = false)
+        awaitRunning(true)
+
+        val client = connect(port)
+        val reader = BufferedReader(client.getInputStream().reader(Charsets.US_ASCII))
+        repeat(MAX_LINES_READ) {
+            val line = reader.readLine() ?: return@repeat
+            assertFalse("a simulated vessel reached a real session: $line", line.startsWith("!AIVDM"))
+        }
+        assertEquals(0, BridgeState.status.value.aisTargets)
+
+        client.close()
+        stop(service)
+        awaitRunning(false)
+    }
+
+    @Test
     fun testModeTransmitsTheSimulatedRiverTrack() {
         // The whole point of test mode: exercise the real path to Navionics from dry land.
         val port = freePort()
@@ -482,6 +540,9 @@ class GpsBridgeServiceTest {
             trackFile().readLines().any { it.contains("source=simulated") },
         )
     }
+
+    /** Enough sentences to cover several emissions without hanging if the stream goes quiet. */
+    private val MAX_LINES_READ = 40
 
     private fun connect(port: Int): Socket {
         var last: Exception? = null

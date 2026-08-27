@@ -32,6 +32,7 @@
     <string name="status_title">Transmitiendo</string>
     <string name="status_ip">IP del teléfono</string>
     <string name="status_link">Enlace</string>
+    <string name="status_ais">Targets AIS</string>
     <string name="link_cable">cable USB</string>
     <string name="link_hotspot">hotspot del teléfono</string>
     <string name="link_other">red ajena (no zarpa con vos)</string>
@@ -77,6 +78,7 @@
     <string name="sim_title">Modo prueba</string>
     <string name="sim_body">Transmite un barco simulado navegando en el Río de la Plata entre dos puntos separados 12 M, a 4 nudos (3 h por tramo, ida y vuelta). Sirve para probar Navionics de punta a punta sin salir al agua. Lo que sale por la red es idéntico a una navegación real: el aviso está acá, en el registro y en la notificación.</string>
     <string name="switch_sim">Transmitir barco simulado</string>
+    <string name="sim_ais">Además transmite dos barcos AIS de prueba: un carguero a 12 nudos que cruza tu rumbo por el medio del tramo, y una lancha de pesca a 3 nudos cerca del primer waypoint. Sirven para ver si Navionics dibuja los targets. Se llaman TEST y sus MMSI no pertenecen a nadie.</string>
 
     <!-- Registro -->
     <string name="log_open">Ver registro</string>

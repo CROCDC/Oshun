@@ -130,6 +130,30 @@ está donde lo ve la persona, no la tablet:
 - El registro abre la sesión con un evento de modo prueba, y el CSV la marca con
   `source=simulated`.
 
+### Barcos AIS de prueba
+
+En modo prueba el puente además transmite **dos barcos AIS**, para poder ver si Navionics
+dibuja los targets sin depender de que haya tráfico real cerca:
+
+| MMSI | Nombre | Velocidad | Qué hace |
+|---|---|---|---|
+| 701999001 | TEST CARGO | 12 nudos | Cruza el rumbo del barco **en escuadra**, por el medio del tramo |
+| 701999002 | TEST LANCHA | 3 nudos | Da vueltas cerca del waypoint A, en estado *dedicado a la pesca* |
+
+Van por el **mismo socket** que tu posición, que es como los toma un plotter: la posición
+de cada uno como mensaje **tipo 1** (`!AIVDM`) cada 5 segundos, y el nombre como mensaje
+**tipo 24 parte A** cada minuto. Un transponder real repite el nombre cada 6 minutos; un
+minuto es mejor para probar, y cuando un cliente se conecta los dos mensajes salen enseguida
+en vez de dejarte mirando un triángulo sin etiqueta.
+
+Para verlos hay que habilitarlos en la app: **Menu → Map Options → AIS Settings → Display
+AIS Targets**.
+
+Las sentencias son **idénticas a las de un AIS real** (nada en el aire dice "simulado"), así
+que lo único que impide confundirlos es que se llaman `TEST` y que sus MMSI están en un
+bloque que ninguna administración asigna. Fuera del modo prueba **no se transmite ningún
+target**, y eso tiene su propio test.
+
 ## Si Navionics se queda con una posición vieja
 
 Lo más engañoso de este puente es que puede *parecer* que anda mientras la tablet

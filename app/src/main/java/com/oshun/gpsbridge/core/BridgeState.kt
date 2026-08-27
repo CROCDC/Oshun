@@ -43,6 +43,8 @@ data class BridgeStatus(
     val outcome: DeliveryOutcome? = null,
     /** True while the transmitted position is the simulator's, not the phone's. */
     val simulated: Boolean = false,
+    /** How many other vessels are going out on the stream as AIS targets. */
+    val aisTargets: Int = 0,
     /** Sentences emitted as heartbeat (a resend of the last fix), included in [sentencesSent]. */
     val heartbeatsSent: Long = 0,
     val batteryPercent: Int? = null,
