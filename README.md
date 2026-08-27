@@ -204,6 +204,12 @@ no hay ninguno, y el triángulo no dice nada de su edad. Entonces:
 - Las señales de "no disponible" del estándar (102,3 nudos, rumbo 360, heading 511) y la
   posición 0,0 se descartan en vez de dibujarse.
 
+### De dónde salen los datos
+
+Hoy, de [aisstream.io](https://aisstream.io). La comparación con las alternativas —incluidas
+las pagas y la opción de un receptor AIS físico— está en
+[`docs/ais-fuentes.md`](docs/ais-fuentes.md).
+
 ### Lo que no es
 
 **No sirve para evitar colisiones.** Los datos llegan con demora, dependen de que haya señal,
