@@ -10,11 +10,11 @@
     <string name="label_interval">Intervalo de actualización</string>
     <string name="switch_autooff">Apagado automático sin clientes (15 min)</string>
     <string name="switch_rawlog">Registrar cada posición en un CSV</string>
-    <string name="net_req_title">Requisitos de red</string>
-    <string name="net_req_body">El puente solo transmite sobre un enlace que zarpa con vos: el cable USB entre el teléfono y la tablet, o el hotspot del teléfono. En la amarra el Wi-Fi del club alcanza a los dos aparatos y parece que anda, pero a los pocos metros te quedás sin red y la carta se congela.</string>
+    <string name="net_req_title">Cómo se conectan los dos aparatos</string>
+    <string name="net_req_body">Hay dos enlaces que zarpan con vos y cualquiera de los dos sirve igual: el hotspot del teléfono o un cable USB entre los dos aparatos. Por el que elijas va todo — la posición y los targets AIS van por la misma conexión. Lo que no sirve es una Wi-Fi ajena: en la amarra el Wi-Fi del club alcanza a los dos aparatos y parece que anda, pero a los pocos metros te quedás sin red y la carta se congela.</string>
     <string name="net_req_cable">Cable USB entre el teléfono y la tablet</string>
-    <string name="net_req_or">— o, si no hay cable —</string>
-    <string name="net_req_cable_hint">Con el cable puesto, prendé «Anclaje por USB» en el teléfono. Si la tablet no lo reconoce, no todas lo hacen: usá el hotspot.</string>
+    <string name="net_req_or">— o bien —</string>
+    <string name="net_req_cable_hint">Con el cable puesto, prendé «Anclaje por USB» en el teléfono. No todas las tablets lo reconocen; si la tuya no, el hotspot hace exactamente lo mismo.</string>
     <string name="net_req_body_sim">En modo prueba alcanza con que el teléfono y la tablet estén en la misma red: la corrida no sale del escritorio. Prendé el hotspot o conectate a una Wi-Fi.</string>
     <string name="net_req_any">Alguna red local disponible</string>
     <string name="net_req_hotspot">Hotspot del teléfono encendido</string>
@@ -33,6 +33,10 @@
     <string name="status_ip">IP del teléfono</string>
     <string name="status_link">Enlace</string>
     <string name="status_ais">Targets AIS</string>
+    <!-- %1$s: el enlace, %2$s: la IP -->
+    <string name="status_other_address">%1$s: %2$s</string>
+    <string name="status_other_addresses">Otras direcciones</string>
+    <string name="status_other_hint">El teléfono está en más de una red. Si Navionics no engancha, probá con la otra dirección.</string>
     <string name="link_cable">cable USB</string>
     <string name="link_hotspot">hotspot del teléfono</string>
     <string name="link_other">red ajena (no zarpa con vos)</string>

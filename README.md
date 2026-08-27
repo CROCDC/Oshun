@@ -30,31 +30,37 @@ Teléfono (esta app)                         Tablet (Navionics)
 La tablet se conecta por **cable USB** o al **hotspot del teléfono**. La app **no arranca** sobre una Wi‑Fi
 ajena, y eso es a propósito: ver [Requisito de red](#requisito-de-red-cable-primero-hotspot-si-no-hay-cable).
 
-## Requisito de red: cable primero, hotspot si no hay cable
+## Requisito de red: un enlace que zarpe con vos (hotspot o cable)
 
-El puente **solo transmite sobre un enlace que zarpa con vos**. Hay dos, y la app prefiere
-el primero:
+El puente **solo transmite sobre un enlace que zarpa con vos**, y hay dos. **Cualquiera de
+los dos sirve igual**: por el enlace que elijas va todo — la posición y los targets AIS
+viajan por la misma conexión, así que nada anda por uno y no por el otro.
 
-1. **Cable USB entre el teléfono y la tablet** (anclaje por USB). Alcanza por sí solo, con
-   la Wi‑Fi prendida o apagada.
-2. **Hotspot del teléfono**, y para eso hacen falta las dos condiciones:
+1. **Hotspot del teléfono**, y para eso hacen falta las dos condiciones:
    - ✓ **Hotspot del teléfono encendido**
    - ✓ **Wi‑Fi del teléfono apagado**
+2. **Cable USB entre el teléfono y la tablet** (anclaje por USB). Alcanza por sí solo, con
+   la Wi‑Fi prendida o apagada.
 
 Mientras no se cumpla ninguna de las dos opciones, el botón Iniciar queda deshabilitado.
 
 El motivo es una falla real: en la amarra, el Wi‑Fi del club llega a los dos aparatos, el
 emparejamiento funciona y todo parece andar — hasta que zarpás y a los pocos metros el
 teléfono se va de esa red. La IP que la app había mostrado deja de significar nada, la
-tablet pierde al teléfono y la carta se congela sin que ninguno de los dos avise. El
-hotspot es el único enlace que zarpa con vos.
+tablet pierde al teléfono y la carta se congela sin que ninguno de los dos avise. El hotspot
+y el cable son los únicos enlaces que zarpan con vos.
 
-Además, la IP que muestra la app es **la del enlace elegido** — el cable si hay cable, si no
-el hotspot — y no la de cualquier interfaz que aparezca primero: antes podía mostrarte la de
-la Wi‑Fi (o incluso una de la red celular) mientras la tablet estaba del otro lado. La
-tarjeta de estado dice cuál está usando (`Enlace: cable USB` / `hotspot del teléfono`).
+Además, la IP que muestra la app es **la de un enlace que zarpa con vos**, no la de
+cualquier interfaz que aparezca primero: antes podía mostrarte la de la Wi‑Fi (o incluso una
+de la red celular) mientras la tablet estaba del otro lado. La tarjeta de estado dice cuál
+está usando (`Enlace: hotspot del teléfono` / `cable USB`).
 
-### Por qué el cable es mejor, cuando anda
+**Si los dos enlaces están arriba** —por ejemplo el anclaje por USB prendido mientras la
+tablet está en el hotspot— sólo se puede anunciar una dirección, así que se anuncia la del
+cable. Pero la tarjeta de estado lista **las otras direcciones**, porque emparejar contra la
+que no es se ve exactamente igual que un puente roto.
+
+### Qué aporta el cable, cuando anda
 
 Navionics lee NMEA por TCP/UDP, o sea que necesita una **red IP**: no existe entrada serie
 por USB. El anclaje por USB es justamente eso — el cable se presenta como una placa de red
@@ -62,6 +68,9 @@ virtual (`rndis0`/`ncm0`, típicamente `192.168.42.129` del lado del teléfono) 
 el puente es una red más, y la mejor de todas: no tiene alcance que perder, no se le mete
 nadie, no hay que emparejar nada y el teléfono se va cargando en vez de gastarse la batería
 en dos radios.
+
+**No hace falta**: el hotspot hace exactamente el mismo trabajo, y es el camino probado. El
+cable es una opción más, para cuando la preferís.
 
 **La salvedad honesta:** que funcione depende de la tablet, no de la app. La tablet tiene que
 poder actuar de *host* USB y levantar la interfaz del teléfono; algunas lo hacen y otras
@@ -331,7 +340,7 @@ de batería, opcional: solo se usa cuando tocás el botón del banner).
 - [x] Sockets no bloqueantes: se distingue "no había nadie" de "mandé y no lo consumieron"
 - [x] Modo prueba: barco simulado a 4 nudos entre dos waypoints a 12 M, para probar Navionics en seco
 - [x] Requisito de enlace: no se puede transmitir sobre una Wi‑Fi ajena, y la IP mostrada es la del enlace elegido
-- [x] Cable USB (anclaje por USB) como enlace preferido, con el hotspot de alternativa
+- [x] Cable USB (anclaje por USB) como enlace alternativo al hotspot; los dos hacen lo mismo
 - [x] La app muestra su build (versión + commit) y enlaza a la última versión publicada
 - [x] Código en inglés; todos los textos de UI en `res/values/strings.xml`
 - [x] CI que compila el APK y lo publica como artifact

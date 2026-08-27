@@ -32,6 +32,7 @@ object NetworkGate {
             wifiOff = !isWifiEnabled(context),
             cableUp = cable != null,
             address = address,
+            addresses = NetworkUtils.addresses(interfaces),
             anyLocalNetwork = address != null,
         )
     }
