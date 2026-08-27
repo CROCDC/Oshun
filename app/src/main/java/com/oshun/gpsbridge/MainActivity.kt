@@ -57,6 +57,7 @@ import com.oshun.gpsbridge.core.StopReason
 import com.oshun.gpsbridge.net.Link
 import com.oshun.gpsbridge.net.NetworkRequirements
 import com.oshun.gpsbridge.service.GpsBridgeService
+import com.oshun.gpsbridge.store.AisKeyStore
 import com.oshun.gpsbridge.store.ConfigStore
 import kotlinx.coroutines.delay
 
@@ -99,6 +100,10 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
     // Drives the "hace N s" counters, so a stalled bridge is visible without touching anything.
     var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
     var batteryUnrestricted by remember { mutableStateOf(isIgnoringBatteryOptimizations(context)) }
+    var aisEnabled by remember { mutableStateOf(saved.aisEnabled) }
+    // The key lives in its own store, never in the config: config rides in intents, lands in
+    // SharedPreferences as one string and names itself in the CSV header.
+    var aisKey by remember { mutableStateOf(AisKeyStore.load(context)) }
     LaunchedEffect(Unit) {
         while (true) {
             network = NetworkGate.state(context)
@@ -130,6 +135,7 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
                     autoOffEnabled = autoOffEnabled,
                     rawLogEnabled = rawLogEnabled,
                     simulated = simulated,
+                    aisEnabled = aisEnabled,
                 ),
             )
         }
@@ -231,6 +237,17 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
             enabled = simulated,
             editable = !status.running,
             onChange = { simulated = it },
+        )
+
+        AisFeedCard(
+            enabled = aisEnabled,
+            editable = !status.running,
+            apiKey = aisKey,
+            onChange = { aisEnabled = it },
+            onKeyChange = {
+                aisKey = it
+                AisKeyStore.save(context, it)
+            },
         )
 
         // Advisory banners live below the action button: they explain and suggest, and
@@ -429,6 +446,51 @@ private fun openHotspotSettings(context: Context) {
  * Test mode: a simulated boat instead of the phone's GPS. Called out loudly, because a
  * chart plotter showing a position that is not yours is worse than one showing none.
  */
+@Composable
+/**
+ * The internet AIS feed: opt in, and say plainly what it is not.
+ *
+ * The warning is not decoration. Targets arrive delayed, only vessels that transmit AIS are
+ * in them at all, and on this river most of what can hit you transmits nothing — a chart
+ * that looks empty because the feed is thin is the most dangerous thing this feature could
+ * produce.
+ */
+@Composable
+private fun AisFeedCard(
+    enabled: Boolean,
+    editable: Boolean,
+    apiKey: String,
+    onChange: (Boolean) -> Unit,
+    onKeyChange: (String) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.ais_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.ais_body), style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.ais_warning), style = MaterialTheme.typography.bodyMedium)
+            SwitchRow(stringResource(R.string.switch_ais), "switch_ais", enabled, editable, onChange)
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = onKeyChange,
+                label = { Text(stringResource(R.string.ais_key_label)) },
+                enabled = editable,
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("ais_key"),
+            )
+            Text(stringResource(R.string.ais_key_hint), style = MaterialTheme.typography.bodySmall)
+            if (enabled && apiKey.isBlank()) {
+                Text(
+                    stringResource(R.string.ais_key_missing),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun TestModeCard(enabled: Boolean, editable: Boolean, onChange: (Boolean) -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {

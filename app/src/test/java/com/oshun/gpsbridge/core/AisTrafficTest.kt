@@ -49,7 +49,7 @@ class AisTrafficTest {
     fun aNewerReportReplacesTheOlderOne() {
         val old = target(1, distanceNm = 1.0, at = now - 60_000)
         val new = target(1, distanceNm = 2.0)
-        val known = AisTraffic.apply(mapOf(1 to old), AisTraffic.Update.Position(new), now)
+        val known = AisTraffic.merge(mapOf(1 to old), AisTraffic.Update.Position(new), now)
         assertEquals(1, known.size)
         assertEquals(new.latitude, known.getValue(1).latitude, 1e-12)
     }
@@ -58,29 +58,29 @@ class AisTrafficTest {
     fun theNameSurvivesAPositionReportThatDoesNotCarryOne() {
         // Position reports have no name; losing it every few seconds would leave the chart
         // full of anonymous triangles.
-        val named = AisTraffic.apply(emptyMap(), AisTraffic.Update.Position(target(1, name = "RIO PARANA")), now)
-        val moved = AisTraffic.apply(named, AisTraffic.Update.Position(target(1, distanceNm = 3.0)), now)
+        val named = AisTraffic.merge(emptyMap(), AisTraffic.Update.Position(target(1, name = "RIO PARANA")), now)
+        val moved = AisTraffic.merge(named, AisTraffic.Update.Position(target(1, distanceNm = 3.0)), now)
         assertEquals("RIO PARANA", moved.getValue(1).name)
     }
 
     @Test
     fun aStaticMessageNamesAVesselWeAlreadyKnow() {
-        val known = AisTraffic.apply(emptyMap(), AisTraffic.Update.Position(target(1)), now)
-        val renamed = AisTraffic.apply(known, AisTraffic.Update.Name(1, "SARANDI"), now)
+        val known = AisTraffic.merge(emptyMap(), AisTraffic.Update.Position(target(1)), now)
+        val renamed = AisTraffic.merge(known, AisTraffic.Update.Name(1, "SARANDI"), now)
         assertEquals("SARANDI", renamed.getValue(1).name)
     }
 
     @Test
     fun aNameForAVesselWeHaveNeverSeenIsNotAVessel() {
         // Without a position there is nothing to draw, and inventing one is the failure mode.
-        val known = AisTraffic.apply(emptyMap(), AisTraffic.Update.Name(99, "FANTASMA"), now)
+        val known = AisTraffic.merge(emptyMap(), AisTraffic.Update.Name(99, "FANTASMA"), now)
         assertTrue(known.isEmpty())
     }
 
     @Test
     fun everyUpdateAlsoForgetsWhatAgedOut() {
         val stale = mapOf(1 to target(1, at = now - AisTraffic.MAX_AGE_MILLIS - 1))
-        val known = AisTraffic.apply(stale, AisTraffic.Update.Position(target(2)), now)
+        val known = AisTraffic.merge(stale, AisTraffic.Update.Position(target(2)), now)
         assertFalse("the stale one is gone", known.containsKey(1))
         assertTrue(known.containsKey(2))
     }

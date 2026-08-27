@@ -34,7 +34,7 @@ object AisTraffic {
     }
 
     /** Folds one update into what we know, forgetting whatever has aged out meanwhile. */
-    fun apply(known: Map<Int, AisTarget>, update: Update, nowMillis: Long): Map<Int, AisTarget> =
+    fun merge(known: Map<Int, AisTarget>, update: Update, nowMillis: Long): Map<Int, AisTarget> =
         when (update) {
             is Update.Position -> fresh(known, nowMillis) + (update.target.mmsi to named(update.target, known))
             is Update.Name -> {

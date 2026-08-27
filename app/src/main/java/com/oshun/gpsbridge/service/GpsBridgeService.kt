@@ -17,7 +17,9 @@ import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import com.oshun.gpsbridge.MainActivity
 import com.oshun.gpsbridge.R
+import com.oshun.gpsbridge.ais.AisStreamFeed
 import com.oshun.gpsbridge.core.AisSimulator
+import com.oshun.gpsbridge.core.AisTraffic
 import com.oshun.gpsbridge.core.BatteryMath
 import com.oshun.gpsbridge.core.BridgeConfig
 import com.oshun.gpsbridge.core.BridgeLogic
@@ -26,15 +28,18 @@ import com.oshun.gpsbridge.core.DeliveryTracker
 import com.oshun.gpsbridge.core.EventKind
 import com.oshun.gpsbridge.core.EventLog
 import com.oshun.gpsbridge.core.LogEvent
+import com.oshun.gpsbridge.core.Position
 import com.oshun.gpsbridge.core.StopReason
 import com.oshun.gpsbridge.core.TrackLogFormatter
 import com.oshun.gpsbridge.location.FixProvider
 import com.oshun.gpsbridge.location.LocationSource
 import com.oshun.gpsbridge.location.SimulatedFixProvider
+import com.oshun.gpsbridge.model.AisTarget
 import com.oshun.gpsbridge.model.Fix
 import com.oshun.gpsbridge.net.NetworkUtils
 import com.oshun.gpsbridge.net.NmeaTcpServer
 import com.oshun.gpsbridge.net.NmeaTransport
+import com.oshun.gpsbridge.store.AisKeyStore
 import com.oshun.gpsbridge.store.ConfigStore
 import com.oshun.gpsbridge.store.TrackLogWriter
 import kotlinx.coroutines.CoroutineScope
@@ -90,9 +95,16 @@ class GpsBridgeService : Service() {
     /** When this session started, so the simulated traffic sails the same clock as the boat. */
     private var simulationStartedAtMillis = 0L
 
-    /** When the simulated targets' positions and names last went out; they run slower than a fix. */
+    /** When the AIS targets' positions and names last went out; they run slower than a fix. */
     private var lastAisAtMillis = 0L
     private var lastAisNamesAtMillis = 0L
+
+    /** The live connection to the internet AIS feed, when the user turned it on. */
+    private var aisFeed: AisStreamFeed? = null
+
+    /** What the feed has told us so far, keyed by MMSI. Written from the feed's own thread. */
+    @Volatile
+    private var aisTargets: Map<Int, AisTarget> = emptyMap()
 
     @Volatile
     private var lastClientCount = 0
@@ -128,6 +140,7 @@ class GpsBridgeService : Service() {
             autoOffEnabled = intent.getBooleanExtra(EXTRA_AUTO_OFF, true),
             rawLogEnabled = intent.getBooleanExtra(EXTRA_RAW_LOG, true),
             simulated = intent.getBooleanExtra(EXTRA_SIMULATED, false),
+            aisEnabled = intent.getBooleanExtra(EXTRA_AIS, false),
         )
     }
 
@@ -210,6 +223,8 @@ class GpsBridgeService : Service() {
         }
         updateNotification()
 
+        startAisFeed(newConfig)
+
         // Test mode bypasses the injectable factory on purpose: the simulator is the thing
         // under test, so nothing may stand in for it.
         val source = if (newConfig.simulated) SimulatedFixProvider() else fixProviderFactory(this)
@@ -230,6 +245,7 @@ class GpsBridgeService : Service() {
                 .onEach { fix ->
                     lastFix = fix
                     lastFixAtMillis = System.currentTimeMillis()
+                    aisFeed?.onOwnPosition(Position(fix.latitude, fix.longitude))
                     emitCurrentFix(heartbeat = false)
                 }
                 .collect { }
@@ -267,7 +283,7 @@ class GpsBridgeService : Service() {
      * a second, and the names go out rarer still.
      */
     private fun aisSentences(current: BridgeConfig, now: Long): List<String> {
-        if (!current.simulated) return emptyList()
+        if (!current.simulated && aisFeed == null) return emptyList()
         if (!BridgeLogic.shouldEmitAgain(now, lastAisAtMillis, BridgeLogic.AIS_POSITION_INTERVAL_MILLIS)) {
             return emptyList()
         }
@@ -275,9 +291,55 @@ class GpsBridgeService : Service() {
             BridgeLogic.shouldEmitAgain(now, lastAisNamesAtMillis, BridgeLogic.AIS_STATIC_INTERVAL_MILLIS)
         lastAisAtMillis = now
         if (withNames) lastAisNamesAtMillis = now
-        val targets = AisSimulator.targetsAt(now - simulationStartedAtMillis, now)
+
+        // Test mode invents its own traffic; otherwise it is whatever the feed still stands
+        // behind — near us, and young enough to be worth drawing.
+        val targets = if (current.simulated) {
+            AisSimulator.targetsAt(now - simulationStartedAtMillis, now)
+        } else {
+            AisTraffic.visible(aisTargets, lastFix?.let { Position(it.latitude, it.longitude) }, now)
+        }
         BridgeState.update { it.copy(aisTargets = targets.size) }
         return BridgeLogic.aisSentencesFor(targets, now, withNames)
+    }
+
+    /**
+     * Folds one feed update into what we know. Synchronized on the same monitor as the
+     * emission, so a batch of sentences is built from one consistent picture of the traffic
+     * rather than from a table changing under it.
+     */
+    @Synchronized
+    private fun rememberTarget(update: AisTraffic.Update) {
+        aisTargets = AisTraffic.merge(aisTargets, update, System.currentTimeMillis())
+    }
+
+    /**
+     * Opens the internet AIS feed, when the user asked for it and gave it a key. Never in
+     * test mode: the simulated traffic is the thing under test there, and mixing real
+     * vessels into it would make the chart impossible to read.
+     */
+    private fun startAisFeed(current: BridgeConfig) {
+        aisTargets = emptyMap()
+        if (!current.aisEnabled || current.simulated) return
+        val apiKey = AisKeyStore.load(this)
+        if (apiKey.isBlank()) return
+        aisFeed = AisStreamFeed(
+            apiKey = apiKey,
+            scope = scope,
+            onUpdate = { update -> rememberTarget(update) },
+            onConnected = { connected ->
+                // Worth a line of its own: while the feed is down the chart keeps your own
+                // position and quietly stops showing anybody else's.
+                EventLog.record(
+                    LogEvent(
+                        atMillis = System.currentTimeMillis(),
+                        kind = EventKind.AIS_FEED,
+                        detail = if (connected) "up" else "down",
+                    ),
+                )
+                if (!connected) aisTargets = emptyMap()
+            },
+        ).also { it.start() }
     }
 
     /** Sends the current fix (fresh or repeated) to every transport, updating the diagnostics. */
@@ -403,6 +465,9 @@ class GpsBridgeService : Service() {
     private fun cancelIdleOff() {
         autoOffJob?.cancel()
         autoOffJob = null
+        aisFeed?.stop()
+        aisFeed = null
+        aisTargets = emptyMap()
     }
 
     /** Samples battery level and instantaneous draw, publishing an estimated drain rate. */
@@ -613,6 +678,7 @@ class GpsBridgeService : Service() {
         const val EXTRA_AUTO_OFF = "autooff"
         const val EXTRA_RAW_LOG = "rawlog"
         const val EXTRA_SIMULATED = "sim"
+        const val EXTRA_AIS = "ais"
 
         fun start(context: Context, config: BridgeConfig) {
             val intent = Intent(context, GpsBridgeService::class.java).apply {
@@ -623,6 +689,7 @@ class GpsBridgeService : Service() {
                 putExtra(EXTRA_AUTO_OFF, config.autoOffEnabled)
                 putExtra(EXTRA_RAW_LOG, config.rawLogEnabled)
                 putExtra(EXTRA_SIMULATED, config.simulated)
+                putExtra(EXTRA_AIS, config.aisEnabled)
             }
             context.startForegroundService(intent)
         }

@@ -82,6 +82,15 @@
     <string name="sim_title">Modo prueba</string>
     <string name="sim_body">Transmite un barco simulado navegando en el Río de la Plata entre dos puntos separados 12 M, a 4 nudos (3 h por tramo, ida y vuelta). Sirve para probar Navionics de punta a punta sin salir al agua. Lo que sale por la red es idéntico a una navegación real: el aviso está acá, en el registro y en la notificación.</string>
     <string name="switch_sim">Transmitir barco simulado</string>
+    <string name="ais_title">Barcos AIS (internet)</string>
+    <string name="ais_body">Muestra en la carta los barcos que un servicio de internet reporta cerca tuyo. Necesita datos: en el canal suele haber señal, mar afuera no. Va por la misma conexión que tu posición, así que anda igual por hotspot o por cable.</string>
+    <string name="ais_warning">No sirve para evitar colisiones. Los datos llegan con demora, y sólo aparecen los barcos que transmiten AIS: lanchas, pescadores y todo lo que no transmite no está. Si el feed se corta, la app deja de mandar targets en vez de dejarte fantasmas en la carta.</string>
+    <string name="switch_ais">Transmitir barcos AIS de internet</string>
+    <string name="ais_key_label">API key de aisstream.io</string>
+    <string name="ais_key_hint">Se saca gratis en aisstream.io. Queda guardada sólo en este teléfono.</string>
+    <string name="ais_key_missing">Falta la API key: sin eso no se puede conectar al feed.</string>
+    <string name="log_ais_up">Feed AIS conectado</string>
+    <string name="log_ais_down">Feed AIS caído: se dejan de mostrar otros barcos</string>
     <string name="sim_ais">Además transmite dos barcos AIS de prueba: un carguero a 12 nudos que cruza tu rumbo por el medio del tramo, y una lancha de pesca a 3 nudos cerca del primer waypoint. Sirven para ver si Navionics dibuja los targets. Se llaman TEST y sus MMSI no pertenecen a nadie.</string>
 
     <!-- Registro -->

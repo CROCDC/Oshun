@@ -102,4 +102,22 @@ class ConfigCodecTest {
         assertTrue(encoded.contains("tcp=1"))
         assertTrue(encoded.contains("udp=0"))
     }
+
+    @Test
+    fun theAisSwitchSurvivesARestart() {
+        // START_STICKY hands the service a null intent; without this the feed would come back
+        // off after a system restart while the screen still showed it on.
+        val config = BridgeConfig(aisEnabled = true)
+        assertTrue(ConfigCodec.decode(ConfigCodec.encode(config)).aisEnabled)
+        assertFalse(ConfigCodec.decode(ConfigCodec.encode(BridgeConfig())).aisEnabled)
+    }
+
+    @Test
+    fun aConfigWrittenBeforeTheAisSwitchExistedStillDecodes() {
+        // The field is simply absent in anything an older build stored.
+        val old = "v1;port=2000;tcp=1;udp=0;interval=1000;autooff=1;rawlog=1;sim=0"
+        val decoded = ConfigCodec.decode(old)
+        assertFalse("absent means off, not broken", decoded.aisEnabled)
+        assertEquals(2000, decoded.port)
+    }
 }

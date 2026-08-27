@@ -30,6 +30,11 @@ internal fun eventLabel(event: LogEvent): String = when (event.kind) {
     EventKind.CLIENT_DISCONNECTED -> stringResource(R.string.log_client_disconnected, event.detail)
     EventKind.DELIVERY -> outcomeLabel(event.outcome)
     EventKind.SIMULATION -> stringResource(R.string.log_simulation)
+    EventKind.AIS_FEED -> if (event.detail == "up") {
+        stringResource(R.string.log_ais_up)
+    } else {
+        stringResource(R.string.log_ais_down)
+    }
     EventKind.FIX -> if (event.fixValid == true) {
         stringResource(R.string.log_fix_ok)
     } else {

@@ -24,6 +24,7 @@ object ConfigCodec {
         "autooff=${config.autoOffEnabled.token()}",
         "rawlog=${config.rawLogEnabled.token()}",
         "sim=${config.simulated.token()}",
+        "ais=${config.aisEnabled.token()}",
     ).joinToString(";")
 
     fun decode(encoded: String?): BridgeConfig {
@@ -44,6 +45,7 @@ object ConfigCodec {
             autoOffEnabled = fields["autooff"].toBooleanOr(defaults.autoOffEnabled),
             rawLogEnabled = fields["rawlog"].toBooleanOr(defaults.rawLogEnabled),
             simulated = fields["sim"].toBooleanOr(defaults.simulated),
+            aisEnabled = fields["ais"].toBooleanOr(defaults.aisEnabled),
         )
         // A config with no transport can't transmit anything; fall back to TCP rather
         // than restarting into a bridge that is "running" but mute.

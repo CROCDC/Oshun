@@ -15,6 +15,12 @@ enum class EventKind {
 
     /** The session is transmitting the simulator's track, not the phone's GPS. */
     SIMULATION,
+
+    /**
+     * The internet AIS feed connected or dropped. Worth its own line: while it is down the
+     * chart keeps your own position and quietly stops showing anybody else's.
+     */
+    AIS_FEED,
 }
 
 /**

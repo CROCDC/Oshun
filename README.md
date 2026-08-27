@@ -179,6 +179,38 @@ que lo único que impide confundirlos es que se llaman `TEST` y que sus MMSI est
 bloque que ninguna administración asigna. Fuera del modo prueba **no se transmite ningún
 target**, y eso tiene su propio test.
 
+## Barcos AIS de internet
+
+Además de tu posición, el puente puede mostrar en la carta **los barcos que un servicio de
+internet reporta cerca tuyo**. Está apagado por defecto y hay que darle una API key.
+
+1. Sacá una key gratis en [aisstream.io](https://aisstream.io).
+2. En la app, tarjeta **Barcos AIS (internet)**: pegá la key y prendé el switch.
+3. En Navionics: **Menu → Map Options → AIS Settings → Display AIS Targets**.
+
+Los targets van por **la misma conexión que tu posición**, así que funciona igual por hotspot
+o por cable. La key queda guardada sólo en el teléfono, en su propio almacenamiento: nunca
+entra en la configuración que viaja por intents, ni en el CSV, ni en el registro.
+
+### Lo que hace para no mentirte
+
+Un target viejo dibujado como si fuera actual es peor que no tener nada: pone un barco donde
+no hay ninguno, y el triángulo no dice nada de su edad. Entonces:
+
+- Un reporte tiene **vencimiento (6 minutos)**. Pasado eso se descarta, no se vuelve a dibujar.
+- Sólo salen los que están **a menos de 12 M**, los más cercanos primero, hasta 40.
+- **Si el feed se corta**, la app lo anota en el registro y deja de mandar targets, en vez de
+  dejarte fantasmas en la carta.
+- Las señales de "no disponible" del estándar (102,3 nudos, rumbo 360, heading 511) y la
+  posición 0,0 se descartan en vez de dibujarse.
+
+### Lo que no es
+
+**No sirve para evitar colisiones.** Los datos llegan con demora, dependen de que haya señal,
+y sólo incluyen barcos que **transmiten AIS**: lanchas, pescadores y casi todo lo chico no
+está. Una carta que se ve vacía porque el feed es pobre es lo más peligroso que esta función
+puede producir, y por eso el aviso está en la app y no sólo acá.
+
 ## Si Navionics se queda con una posición vieja
 
 Lo más engañoso de este puente es que puede *parecer* que anda mientras la tablet
@@ -357,6 +389,7 @@ de batería, opcional: solo se usa cuando tocás el botón del banner).
 - [x] Modo prueba: barco simulado a 4 nudos entre dos waypoints a 12 M, para probar Navionics en seco
 - [x] Requisito de enlace: no se puede transmitir sobre una Wi‑Fi ajena, y la IP mostrada es la del enlace elegido
 - [x] Cable USB (anclaje por USB) como enlace alternativo al hotspot; los dos hacen lo mismo
+- [x] Barcos AIS: dos simulados en modo prueba, y un feed real de internet con vencimiento y aviso
 - [x] La app muestra su build (versión + commit) y enlaza a la última versión publicada
 - [x] Código en inglés; todos los textos de UI en `res/values/strings.xml`
 - [x] CI que compila el APK y lo publica como artifact
