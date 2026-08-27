@@ -526,12 +526,13 @@ private fun StatusCard(status: BridgeStatus, network: NetworkRequirements, nowMi
             // others is the difference between "it does not work" and "pair with that one".
             val others = network.otherAddresses()
             if (others.isNotEmpty()) {
-                KeyValue(
-                    stringResource(R.string.status_other_addresses),
-                    others.joinToString(" · ") {
-                        stringResource(R.string.status_other_address, linkText(it.link), it.ipv4)
-                    },
-                )
+                // Resolved in the composable's own scope: joinToString takes a noinline
+                // lambda, and stringResource cannot be called from inside one.
+                val labels = mutableListOf<String>()
+                for (other in others) {
+                    labels += stringResource(R.string.status_other_address, linkText(other.link), other.ipv4)
+                }
+                KeyValue(stringResource(R.string.status_other_addresses), labels.joinToString(" · "))
                 Text(
                     stringResource(R.string.status_other_hint),
                     style = MaterialTheme.typography.bodySmall,
