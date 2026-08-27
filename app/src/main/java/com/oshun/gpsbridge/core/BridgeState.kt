@@ -4,6 +4,7 @@ import com.oshun.gpsbridge.model.Fix
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /** User-chosen configuration for a bridge session. */
 data class BridgeConfig(
@@ -43,6 +44,8 @@ data class BridgeStatus(
     val outcome: DeliveryOutcome? = null,
     /** True while the transmitted position is the simulator's, not the phone's. */
     val simulated: Boolean = false,
+    /** How many other vessels are going out on the stream as AIS targets. */
+    val aisTargets: Int = 0,
     /** Sentences emitted as heartbeat (a resend of the last fix), included in [sentencesSent]. */
     val heartbeatsSent: Long = 0,
     val batteryPercent: Int? = null,
@@ -58,8 +61,16 @@ object BridgeState {
     private val _status = MutableStateFlow(BridgeStatus())
     val status: StateFlow<BridgeStatus> = _status.asStateFlow()
 
+    /**
+     * Atomic on purpose. Six threads write here — the fix collector, the heartbeat, the
+     * accept thread, the battery monitor, the stop path — and a plain read-modify-write
+     * loses one of two concurrent updates. Worse, an emission that read the status just
+     * before a stop used to write its copy back *after* [reset], resurrecting `running =
+     * true` on a bridge that had already stopped: the UI then says "Transmitiendo" over a
+     * dead service. The compare-and-set retries against the value that actually won.
+     */
     fun update(transform: (BridgeStatus) -> BridgeStatus) {
-        _status.value = transform(_status.value)
+        _status.update(transform)
     }
 
     fun reset() {

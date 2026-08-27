@@ -54,6 +54,7 @@ import com.oshun.gpsbridge.core.BridgeStatus
 import com.oshun.gpsbridge.crash.CrashActivity
 import com.oshun.gpsbridge.crash.CrashStore
 import com.oshun.gpsbridge.core.StopReason
+import com.oshun.gpsbridge.net.Link
 import com.oshun.gpsbridge.net.NetworkRequirements
 import com.oshun.gpsbridge.service.GpsBridgeService
 import com.oshun.gpsbridge.store.ConfigStore
@@ -245,7 +246,7 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
             BatteryOptimizationBanner(onFix = { openBatteryOptimizationSettings(context) })
         }
 
-        if (status.running) StatusCard(status, nowMillis)
+        if (status.running) StatusCard(status, network.link, nowMillis)
 
         InstructionsCard()
 
@@ -327,6 +328,22 @@ private fun NetworkRequirementsCard(
                     onFix = onOpenHotspot,
                 )
             } else {
+                // The cable is enough on its own; the hotspot rows below are the alternative.
+                RequirementRow(
+                    met = network.cableUp,
+                    label = stringResource(R.string.net_req_cable),
+                    actionLabel = stringResource(R.string.net_open_usb),
+                    tag = "fix_usb",
+                    onFix = onOpenHotspot, // the tethering screen is where USB tethering lives
+                )
+                Text(
+                    stringResource(R.string.net_req_cable_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    stringResource(R.string.net_req_or),
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 RequirementRow(
                     met = network.hotspotUp,
                     label = stringResource(R.string.net_req_hotspot),
@@ -345,6 +362,16 @@ private fun NetworkRequirementsCard(
         }
     }
 }
+
+/** What to call the link the advertised address belongs to. */
+@Composable
+private fun linkText(link: Link): String = stringResource(
+    when (link) {
+        Link.CABLE -> R.string.link_cable
+        Link.HOTSPOT -> R.string.link_hotspot
+        Link.OTHER -> R.string.link_other
+    },
+)
 
 @Composable
 private fun RequirementRow(
@@ -407,6 +434,7 @@ private fun TestModeCard(enabled: Boolean, editable: Boolean, onChange: (Boolean
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.sim_title), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.sim_body), style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.sim_ais), style = MaterialTheme.typography.bodyMedium)
             SwitchRow(stringResource(R.string.switch_sim), "switch_sim", enabled, editable, onChange)
         }
     }
@@ -480,7 +508,7 @@ private fun CrashBanner(onView: () -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun StatusCard(status: BridgeStatus, nowMillis: Long) {
+private fun StatusCard(status: BridgeStatus, link: Link?, nowMillis: Long) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(R.string.status_title), style = MaterialTheme.typography.titleMedium)
@@ -492,6 +520,10 @@ private fun StatusCard(status: BridgeStatus, nowMillis: Long) {
                 )
             }
             KeyValue(stringResource(R.string.status_ip), status.ipAddress ?: stringResource(R.string.status_no_wifi))
+            link?.let { KeyValue(stringResource(R.string.status_link), linkText(it)) }
+            if (status.aisTargets > 0) {
+                KeyValue(stringResource(R.string.status_ais), status.aisTargets.toString())
+            }
             KeyValue(stringResource(R.string.status_port), status.port.toString())
             val protocols = BridgeLogic.enabledProtocols(status)
                 .joinToString(" + ")

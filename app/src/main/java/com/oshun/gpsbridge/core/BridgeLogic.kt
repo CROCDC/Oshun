@@ -1,10 +1,12 @@
 package com.oshun.gpsbridge.core
 
+import com.oshun.gpsbridge.model.AisTarget
 import com.oshun.gpsbridge.model.Fix
 import com.oshun.gpsbridge.net.NmeaTcpServer
 import com.oshun.gpsbridge.net.NmeaTransport
 import com.oshun.gpsbridge.net.NmeaUdpBroadcaster
 import com.oshun.gpsbridge.net.SendResult
+import com.oshun.gpsbridge.nmea.AisEncoder
 import com.oshun.gpsbridge.nmea.NmeaFormatter
 import java.util.Locale
 
@@ -41,6 +43,34 @@ object BridgeLogic {
      */
     fun shouldResend(nowMillis: Long, lastSentAtMillis: Long, intervalMillis: Long): Boolean =
         lastSentAtMillis <= 0L || nowMillis - lastSentAtMillis >= intervalMillis
+
+    /**
+     * How often a target's position goes out. A real class A transponder reports every 2 to
+     * 10 seconds depending on its speed; one fixed rate in that band is enough to be drawn
+     * and moved, and far less traffic than repeating it with every fix of our own.
+     */
+    const val AIS_POSITION_INTERVAL_MILLIS = 5_000L
+
+    /**
+     * How often the names go out. A real transponder repeats its static data every 6 minutes,
+     * which is a long time to stare at an unlabelled triangle after connecting — a minute
+     * costs one extra sentence a minute per target and labels the chart much sooner.
+     */
+    const val AIS_STATIC_INTERVAL_MILLIS = 60_000L
+
+    /** True when [intervalMillis] has passed since the last one, or nothing has gone out yet. */
+    fun shouldEmitAgain(nowMillis: Long, lastAtMillis: Long, intervalMillis: Long): Boolean =
+        lastAtMillis <= 0L || nowMillis - lastAtMillis >= intervalMillis
+
+    /**
+     * The AIS sentences to append to this batch: the positions when they are due, and the
+     * names only on the slower cycle.
+     */
+    fun aisSentencesFor(targets: List<AisTarget>, nowMillis: Long, withNames: Boolean): List<String> =
+        targets.flatMap { target ->
+            if (withNames) AisEncoder.sentences(target, nowMillis)
+            else listOf(AisEncoder.positionReport(target, nowMillis))
+        }
 
     /**
      * Whether the idle watchdog applies. Reception is only observable over TCP (UDP is

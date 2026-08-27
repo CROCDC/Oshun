@@ -141,6 +141,9 @@ class MainActivityTest {
         // These labels are unique to the status card (the port label also labels the field).
         compose.onNodeWithText(str(R.string.status_title)).assertExists()
         compose.onNodeWithText(str(R.string.status_ip)).assertExists()
+        // Which link is carrying the position: a cable and a hotspot fail in different ways.
+        compose.onNodeWithText(str(R.string.status_link)).assertExists()
+        compose.onNodeWithText(str(R.string.link_hotspot)).assertExists()
         compose.onNodeWithText(str(R.string.status_protocols)).assertExists()
         compose.onNodeWithText(str(R.string.status_sentences)).assertExists()
         // Diagnostics rows: they are what tells a stalled bridge from a healthy one.
@@ -183,6 +186,28 @@ class MainActivityTest {
                 compose.onAllNodesWithText(str(R.string.net_req_title)).fetchSemanticsNodes().isNotEmpty()
             }
             compose.onNodeWithTag("action_button").assertIsNotEnabled()
+        } finally {
+            NetworkGate.stateProvider = { PAIRED_OVER_HOTSPOT }
+        }
+    }
+
+    @Test
+    fun aCableIsEnoughEvenWithTheWifiOn() {
+        // The address a USB link advertises exists only on that cable, so a Wi-Fi left on
+        // cannot point the tablet at the wrong place — the hotspot rule has nothing to guard.
+        NetworkGate.stateProvider = {
+            NetworkRequirements(
+                hotspotUp = false,
+                wifiOff = false,
+                cableUp = true,
+                address = "192.168.42.129",
+            )
+        }
+        try {
+            compose.waitUntil(timeoutMillis = 5_000) {
+                compose.onAllNodesWithText(str(R.string.net_req_title)).fetchSemanticsNodes().isEmpty()
+            }
+            compose.onNodeWithTag("action_button").assertIsEnabled()
         } finally {
             NetworkGate.stateProvider = { PAIRED_OVER_HOTSPOT }
         }

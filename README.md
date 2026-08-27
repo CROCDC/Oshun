@@ -22,21 +22,26 @@ salir a buscar.
 ```
 Teléfono (esta app)                         Tablet (Navionics)
   lee GPS (1 Hz)                              Paired Devices:
-  → arma NMEA ($GPRMC/$GPGGA)   ── Wi‑Fi ──▶    IP = <ip del telefono>
+  → arma NMEA ($GPRMC/$GPGGA)   ─ USB/Wi‑Fi ─▶    IP = <ip del telefono>
   → TCP :2000  y/o  UDP :2000                   Port = 2000
                                                 Protocol = TCP o UDP
 ```
 
-La tablet se conecta al **hotspot del teléfono**. La app **no arranca** sobre una Wi‑Fi
-ajena, y eso es a propósito: ver [Requisito de red](#requisito-de-red-el-hotspot-no-es-opcional).
+La tablet se conecta por **cable USB** o al **hotspot del teléfono**. La app **no arranca** sobre una Wi‑Fi
+ajena, y eso es a propósito: ver [Requisito de red](#requisito-de-red-cable-primero-hotspot-si-no-hay-cable).
 
-## Requisito de red: el hotspot no es opcional
+## Requisito de red: cable primero, hotspot si no hay cable
 
-El puente **solo transmite sobre el hotspot del teléfono**. Mientras no se cumplan las dos
-condiciones, el botón Iniciar queda deshabilitado:
+El puente **solo transmite sobre un enlace que zarpa con vos**. Hay dos, y la app prefiere
+el primero:
 
-- ✓ **Hotspot del teléfono encendido**
-- ✓ **Wi‑Fi del teléfono apagado**
+1. **Cable USB entre el teléfono y la tablet** (anclaje por USB). Alcanza por sí solo, con
+   la Wi‑Fi prendida o apagada.
+2. **Hotspot del teléfono**, y para eso hacen falta las dos condiciones:
+   - ✓ **Hotspot del teléfono encendido**
+   - ✓ **Wi‑Fi del teléfono apagado**
+
+Mientras no se cumpla ninguna de las dos opciones, el botón Iniciar queda deshabilitado.
 
 El motivo es una falla real: en la amarra, el Wi‑Fi del club llega a los dos aparatos, el
 emparejamiento funciona y todo parece andar — hasta que zarpás y a los pocos metros el
@@ -44,9 +49,31 @@ teléfono se va de esa red. La IP que la app había mostrado deja de significar 
 tablet pierde al teléfono y la carta se congela sin que ninguno de los dos avise. El
 hotspot es el único enlace que zarpa con vos.
 
-Además, la IP que muestra la app es **la del hotspot**, no la de cualquier interfaz que
-aparezca primero: antes podía mostrarte la de la Wi‑Fi (o incluso una de la red celular)
-mientras la tablet estaba del otro lado.
+Además, la IP que muestra la app es **la del enlace elegido** — el cable si hay cable, si no
+el hotspot — y no la de cualquier interfaz que aparezca primero: antes podía mostrarte la de
+la Wi‑Fi (o incluso una de la red celular) mientras la tablet estaba del otro lado. La
+tarjeta de estado dice cuál está usando (`Enlace: cable USB` / `hotspot del teléfono`).
+
+### Por qué el cable es mejor, cuando anda
+
+Navionics lee NMEA por TCP/UDP, o sea que necesita una **red IP**: no existe entrada serie
+por USB. El anclaje por USB es justamente eso — el cable se presenta como una placa de red
+virtual (`rndis0`/`ncm0`, típicamente `192.168.42.129` del lado del teléfono) — así que para
+el puente es una red más, y la mejor de todas: no tiene alcance que perder, no se le mete
+nadie, no hay que emparejar nada y el teléfono se va cargando en vez de gastarse la batería
+en dos radios.
+
+**La salvedad honesta:** que funcione depende de la tablet, no de la app. La tablet tiene que
+poder actuar de *host* USB y levantar la interfaz del teléfono; algunas lo hacen y otras
+directamente no la ven. Se prueba en treinta segundos: cable puesto → en el teléfono,
+Ajustes → Anclaje → **Anclaje por USB** → si la app pasa a mostrar `Enlace: cable USB` y una
+IP `192.168.42.x`, andá con cable. Si no aparece, es la tablet: usá el hotspot, que sigue
+funcionando exactamente igual que antes.
+
+Un detalle práctico: con cable C‑a‑C los dos aparatos negocian quién es host y no siempre te
+toca el que querés. Si no arranca, probá dar vuelta el cable o usar un adaptador OTG del lado
+de la tablet. Y si el teléfono no te deja prender el anclaje por USB sin datos móviles
+activos, eso es del ROM, no de la app.
 
 **Única excepción: el modo prueba.** Con el barco simulado encendido alcanza con que los
 dos aparatos estén en la misma red (la de tu casa, por ejemplo), porque esa corrida no sale
@@ -67,9 +94,12 @@ La app puede emitir por los dos a la vez; después probás cuál te funciona mej
 
 ## Emparejar en la tablet
 
-1. Prendé el **hotspot** del teléfono y **apagá su Wi‑Fi**; conectá la tablet a ese hotspot.
+1. Enlazá los aparatos, de una de estas dos maneras:
+   - **Cable USB** (preferido): cable entre teléfono y tablet, y en el teléfono
+     Ajustes → Anclaje → **Anclaje por USB**.
+   - **Hotspot**: prendé el hotspot del teléfono, **apagá su Wi‑Fi** y conectá la tablet a ese hotspot.
 2. Abrí la app en el teléfono, elegí TCP/UDP y puerto, y tocá **Iniciar**. Anotá la **IP** que muestra
-   (es la del hotspot).
+   (la del enlace que eligió; la tarjeta de estado te dice cuál es).
 3. En Navionics: **Menú → Paired Devices → Add device manually**.
 4. Ingresá **Host = IP del teléfono**, **Port = 2000**, **Protocol = TCP** (o UDP) y guardá.
 5. La posición del teléfono aparece y se mueve en la carta.
@@ -99,6 +129,30 @@ está donde lo ve la persona, no la tablet:
 - La notificación del servicio cambia a **"Oshun — MODO PRUEBA (posición simulada)"**.
 - El registro abre la sesión con un evento de modo prueba, y el CSV la marca con
   `source=simulated`.
+
+### Barcos AIS de prueba
+
+En modo prueba el puente además transmite **dos barcos AIS**, para poder ver si Navionics
+dibuja los targets sin depender de que haya tráfico real cerca:
+
+| MMSI | Nombre | Velocidad | Qué hace |
+|---|---|---|---|
+| 701999001 | TEST CARGO | 12 nudos | Cruza el rumbo del barco **en escuadra**, por el medio del tramo |
+| 701999002 | TEST LANCHA | 3 nudos | Da vueltas cerca del waypoint A, en estado *dedicado a la pesca* |
+
+Van por el **mismo socket** que tu posición, que es como los toma un plotter: la posición
+de cada uno como mensaje **tipo 1** (`!AIVDM`) cada 5 segundos, y el nombre como mensaje
+**tipo 24 parte A** cada minuto. Un transponder real repite el nombre cada 6 minutos; un
+minuto es mejor para probar, y cuando un cliente se conecta los dos mensajes salen enseguida
+en vez de dejarte mirando un triángulo sin etiqueta.
+
+Para verlos hay que habilitarlos en la app: **Menu → Map Options → AIS Settings → Display
+AIS Targets**.
+
+Las sentencias son **idénticas a las de un AIS real** (nada en el aire dice "simulado"), así
+que lo único que impide confundirlos es que se llaman `TEST` y que sus MMSI están en un
+bloque que ninguna administración asigna. Fuera del modo prueba **no se transmite ningún
+target**, y eso tiene su propio test.
 
 ## Si Navionics se queda con una posición vieja
 
@@ -276,7 +330,8 @@ de batería, opcional: solo se usa cuando tocás el botón del banner).
 - [x] Registro de sesión en la app + CSV rotativo de cada posición, con el resultado de cada envío
 - [x] Sockets no bloqueantes: se distingue "no había nadie" de "mandé y no lo consumieron"
 - [x] Modo prueba: barco simulado a 4 nudos entre dos waypoints a 12 M, para probar Navionics en seco
-- [x] Requisito de hotspot: no se puede transmitir sobre una Wi‑Fi ajena, y la IP mostrada es la del hotspot
+- [x] Requisito de enlace: no se puede transmitir sobre una Wi‑Fi ajena, y la IP mostrada es la del enlace elegido
+- [x] Cable USB (anclaje por USB) como enlace preferido, con el hotspot de alternativa
 - [x] La app muestra su build (versión + commit) y enlaza a la última versión publicada
 - [x] Código en inglés; todos los textos de UI en `res/values/strings.xml`
 - [x] CI que compila el APK y lo publica como artifact

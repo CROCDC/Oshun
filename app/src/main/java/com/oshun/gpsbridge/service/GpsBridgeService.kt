@@ -17,6 +17,7 @@ import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import com.oshun.gpsbridge.MainActivity
 import com.oshun.gpsbridge.R
+import com.oshun.gpsbridge.core.AisSimulator
 import com.oshun.gpsbridge.core.BatteryMath
 import com.oshun.gpsbridge.core.BridgeConfig
 import com.oshun.gpsbridge.core.BridgeLogic
@@ -85,6 +86,13 @@ class GpsBridgeService : Service() {
 
     @Volatile
     private var lastSentAtMillis = 0L
+
+    /** When this session started, so the simulated traffic sails the same clock as the boat. */
+    private var simulationStartedAtMillis = 0L
+
+    /** When the simulated targets' positions and names last went out; they run slower than a fix. */
+    private var lastAisAtMillis = 0L
+    private var lastAisNamesAtMillis = 0L
 
     @Volatile
     private var lastClientCount = 0
@@ -174,6 +182,9 @@ class GpsBridgeService : Service() {
         if (newConfig.simulated) {
             EventLog.record(LogEvent(atMillis = startedAt, kind = EventKind.SIMULATION))
         }
+        simulationStartedAtMillis = startedAt
+        lastAisAtMillis = 0L
+        lastAisNamesAtMillis = 0L
         if (newConfig.rawLogEnabled) {
             TrackLogWriter.open(this, TrackLogFormatter.sessionHeader(startedAt, newConfig))
         }
@@ -189,6 +200,7 @@ class GpsBridgeService : Service() {
                 sentencesSent = 0,
                 heartbeatsSent = 0,
                 simulated = newConfig.simulated,
+                aisTargets = 0,
                 lastFix = null,
                 lastFixAtMillis = null,
                 lastSendOkAtMillis = null,
@@ -247,6 +259,27 @@ class GpsBridgeService : Service() {
         if (autoOffEnabled) armIdleOff()
     }
 
+    /**
+     * The simulated traffic to append to this batch, or nothing outside test mode.
+     *
+     * Targets travel on the same stream as our own position — that is how a plotter takes
+     * them — but on their own, slower clock: a real transponder does not repeat itself once
+     * a second, and the names go out rarer still.
+     */
+    private fun aisSentences(current: BridgeConfig, now: Long): List<String> {
+        if (!current.simulated) return emptyList()
+        if (!BridgeLogic.shouldEmitAgain(now, lastAisAtMillis, BridgeLogic.AIS_POSITION_INTERVAL_MILLIS)) {
+            return emptyList()
+        }
+        val withNames =
+            BridgeLogic.shouldEmitAgain(now, lastAisNamesAtMillis, BridgeLogic.AIS_STATIC_INTERVAL_MILLIS)
+        lastAisAtMillis = now
+        if (withNames) lastAisNamesAtMillis = now
+        val targets = AisSimulator.targetsAt(now - simulationStartedAtMillis, now)
+        BridgeState.update { it.copy(aisTargets = targets.size) }
+        return BridgeLogic.aisSentencesFor(targets, now, withNames)
+    }
+
     /** Sends the current fix (fresh or repeated) to every transport, updating the diagnostics. */
     @Synchronized
     private fun emitCurrentFix(heartbeat: Boolean) {
@@ -254,7 +287,7 @@ class GpsBridgeService : Service() {
         val current = config ?: return
         val now = System.currentTimeMillis()
         val valid = !BridgeLogic.isStale(now - lastFixAtMillis, current.intervalMillis)
-        val lines = BridgeLogic.sentencesFor(fix, valid)
+        val lines = BridgeLogic.sentencesFor(fix, valid) + aisSentences(current, now)
 
         val results = transports.map { it.broadcast(lines, now) }
         val outcome = BridgeLogic.outcomeFor(results)
@@ -301,8 +334,13 @@ class GpsBridgeService : Service() {
             if (count > 0) cancelIdleOff() else armIdleOff()
         }
         // A client that just connected would otherwise sit with an empty chart until the
-        // next fix arrives; give it the last known position right away.
-        if (count > previous) emitCurrentFix(heartbeat = true)
+        // next fix arrives; give it the last known position — and the traffic around it,
+        // which is on a slower cycle and would otherwise take a minute to name itself.
+        if (count > previous) {
+            lastAisAtMillis = 0L
+            lastAisNamesAtMillis = 0L
+            emitCurrentFix(heartbeat = true)
+        }
     }
 
     /**

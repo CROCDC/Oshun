@@ -1,6 +1,7 @@
 package com.oshun.gpsbridge.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GeoTest {
@@ -52,5 +53,30 @@ class GeoTest {
         val b = Position(-35.0, -58.0)
         assertEquals(a, Geo.interpolate(a, b, -1.0))
         assertEquals(b, Geo.interpolate(a, b, 7.5))
+    }
+
+    @Test
+    fun steeringACourseLandsWhereTheDistanceAndBearingSay() {
+        // destination() is the inverse of the two functions above; if they disagree, one of
+        // the three is wrong and the simulated traffic ends up in the wrong estuary.
+        val start = Position(-34.95, -57.55)
+        val arrived = Geo.destination(start, bearingDegrees = 120.0, distanceNauticalMiles = 12.0)
+        assertEquals(12.0, Geo.distanceNauticalMiles(start, arrived), 1e-6)
+        assertEquals(120.0, Geo.initialBearingDegrees(start, arrived), 0.01)
+    }
+
+    @Test
+    fun aMinuteOfLatitudeIsAMileNorthwards() {
+        // The definition of the nautical mile, and the cheapest check that the radius is right.
+        val start = Position(-34.95, -57.55)
+        val north = Geo.destination(start, bearingDegrees = 0.0, distanceNauticalMiles = 1.0)
+        assertEquals(1.0 / 60.0, north.latitude - start.latitude, 1e-4)
+        assertEquals(start.longitude, north.longitude, 1e-9)
+    }
+
+    @Test
+    fun goingRoundTheWorldStaysInRange() {
+        val arrived = Geo.destination(Position(0.0, 179.5), bearingDegrees = 90.0, distanceNauticalMiles = 120.0)
+        assertTrue("longitude wrapped: ${arrived.longitude}", arrived.longitude in -180.0..180.0)
     }
 }

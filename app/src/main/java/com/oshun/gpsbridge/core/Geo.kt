@@ -36,6 +36,27 @@ object Geo {
     }
 
     /**
+     * The position reached by steering [bearingDegrees] true for [distanceNauticalMiles] from
+     * [from], on the great circle. The inverse of [distanceNauticalMiles] and
+     * [initialBearingDegrees], and what places one vessel relative to another.
+     */
+    fun destination(from: Position, bearingDegrees: Double, distanceNauticalMiles: Double): Position {
+        val lat1 = Math.toRadians(from.latitude)
+        val lon1 = Math.toRadians(from.longitude)
+        val bearing = Math.toRadians(bearingDegrees)
+        val angular = distanceNauticalMiles / EARTH_RADIUS_NM
+        val lat2 = asin(sin(lat1) * cos(angular) + cos(lat1) * sin(angular) * cos(bearing))
+        val lon2 = lon1 + atan2(
+            sin(bearing) * sin(angular) * cos(lat1),
+            cos(angular) - sin(lat1) * sin(lat2),
+        )
+        return Position(
+            latitude = Math.toDegrees(lat2),
+            longitude = ((Math.toDegrees(lon2) + 540.0) % 360.0) - 180.0,
+        )
+    }
+
+    /**
      * A point [fraction] of the way from one position to another. Linear in lat/lon, which
      * over a leg of a few miles differs from the great circle by centimetres — and keeps the
      * simulated boat's speed exactly constant, which is what a test track needs.

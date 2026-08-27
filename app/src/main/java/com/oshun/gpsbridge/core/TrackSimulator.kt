@@ -33,35 +33,20 @@ object TrackSimulator {
 
     const val SPEED_KNOTS = 4.0
 
+    /** The boat itself: one leg, sailed back and forth for ever. */
+    val track = LegTrack(WAYPOINT_A, WAYPOINT_B, SPEED_KNOTS)
+
     /** Length of one leg, in nautical miles. Derived, never hardcoded twice. */
-    val legNauticalMiles: Double = Geo.distanceNauticalMiles(WAYPOINT_A, WAYPOINT_B)
+    val legNauticalMiles: Double get() = track.lengthNauticalMiles
 
     /** How long one leg takes at [SPEED_KNOTS]. */
-    val legMillis: Long = (legNauticalMiles / SPEED_KNOTS * 3_600_000.0).toLong()
+    val legMillis: Long get() = track.legMillis
 
     /** Speed in the units [Fix] carries. */
     val speedMetersPerSecond: Double = SPEED_KNOTS / NmeaFormatter.MPS_TO_KNOTS
 
-    private val outboundBearing = Geo.initialBearingDegrees(WAYPOINT_A, WAYPOINT_B)
-    private val inboundBearing = Geo.initialBearingDegrees(WAYPOINT_B, WAYPOINT_A)
-
     /** The boat's state after [elapsedMillis] of sailing, looping A → B → A forever. */
-    fun stateAt(elapsedMillis: Long): TrackState {
-        val elapsed = elapsedMillis.coerceAtLeast(0L)
-        val cycle = legMillis * 2
-        val phase = elapsed % cycle
-        val outbound = phase < legMillis
-        val legProgress = if (outbound) phase else phase - legMillis
-        val fraction = legProgress.toDouble() / legMillis.toDouble()
-        val from = if (outbound) WAYPOINT_A else WAYPOINT_B
-        val to = if (outbound) WAYPOINT_B else WAYPOINT_A
-        return TrackState(
-            position = Geo.interpolate(from, to, fraction),
-            bearingDegrees = if (outbound) outboundBearing else inboundBearing,
-            speedKnots = SPEED_KNOTS,
-            outbound = outbound,
-        )
-    }
+    fun stateAt(elapsedMillis: Long): TrackState = track.stateAt(elapsedMillis)
 
     /**
      * The same state as a [Fix], indistinguishable on the wire from a real one — that is the

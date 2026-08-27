@@ -11,14 +11,49 @@ class NetworkUtilsTest {
     private val wifi = LocalInterface("wlan0", "192.168.1.37")
     private val hotspot = LocalInterface("ap0", "192.168.43.1")
     private val mobile = LocalInterface("rmnet_data0", "10.84.120.9")
+    private val cable = LocalInterface("rndis0", "192.168.42.129")
 
     @Test
-    fun recognisesTheTetheringInterfaces() {
-        listOf("ap0", "swlan0", "softap0", "wlan1", "rndis0", "usb0", "bt-pan").forEach {
+    fun recognisesTheAccessPointInterfaces() {
+        listOf("ap0", "swlan0", "softap0", "wlan1", "bt-pan").forEach {
             assertTrue("$it is an AP interface", NetworkUtils.isHotspotName(it))
         }
         assertFalse("wlan0 is the client radio", NetworkUtils.isHotspotName("wlan0"))
         assertFalse(NetworkUtils.isHotspotName("eth0"))
+        assertFalse("the cable is a link of its own", NetworkUtils.isHotspotName("rndis0"))
+    }
+
+    @Test
+    fun recognisesTheUsbTetheringInterfaces() {
+        listOf("rndis0", "usb0", "ncm0").forEach {
+            assertTrue("$it is a USB link", NetworkUtils.isCableName(it))
+        }
+        assertFalse(NetworkUtils.isCableName("wlan0"))
+        assertFalse(NetworkUtils.isCableName("ap0"))
+    }
+
+    @Test
+    fun theCableWinsOverEverythingElse() {
+        // A cable cannot lose range, drop signal or be joined by anyone else, so when one is
+        // plugged in it is the address the tablet gets pointed at.
+        assertEquals("192.168.42.129", NetworkUtils.localIpAddress(listOf(wifi, hotspot, cable)))
+        assertEquals(Link.CABLE, NetworkUtils.linkOf(listOf(wifi, hotspot, cable)))
+        assertEquals("192.168.42.129", NetworkUtils.cableAddress(listOf(wifi, cable)))
+    }
+
+    @Test
+    fun theCableIsNotMistakenForAHotspot() {
+        // They are both tethering, but only one of them makes the Wi-Fi rule unnecessary.
+        assertNull(NetworkUtils.hotspotAddress(listOf(cable)))
+        assertNull(NetworkUtils.cableAddress(listOf(wifi, hotspot)))
+    }
+
+    @Test
+    fun namesTheLinkTheAddressCameFrom() {
+        assertEquals(Link.HOTSPOT, NetworkUtils.linkOf(listOf(wifi, hotspot)))
+        assertEquals(Link.OTHER, NetworkUtils.linkOf(listOf(wifi)))
+        assertNull(NetworkUtils.linkOf(emptyList()))
+        assertNull("a carrier address is no link at all", NetworkUtils.linkOf(listOf(mobile)))
     }
 
     @Test
@@ -71,6 +106,7 @@ class NetworkUtilsTest {
             assertEquals("looks like IPv4: ${local.ipv4}", 4, parts.size)
             assertTrue("octets in range: ${local.ipv4}", parts.all { it.toIntOrNull() in 0..255 })
         }
+        NetworkUtils.cableAddress()
         NetworkUtils.hotspotAddress()
         NetworkUtils.localIpAddress()
     }
