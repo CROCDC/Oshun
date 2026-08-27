@@ -212,12 +212,16 @@ class MainActivityTest {
         // Left unsaid, that is indistinguishable from a bridge that does not work.
         NetworkGate.stateProvider = { BOTH_LINKS_UP }
         try {
+            // The screen re-reads the network once a second, so the swapped state does not
+            // reach the card the instant the bridge starts. Wait for it, like every other
+            // assertion here on something published outside this thread.
             compose.onNodeWithTag("action_button").performScrollTo().performClick()
-            compose.waitUntil(timeoutMillis = 5_000) {
-                compose.onAllNodes(hasStopButton()).fetchSemanticsNodes().isNotEmpty()
+            compose.waitUntil(timeoutMillis = 10_000) {
+                compose.onAllNodes(hasStopButton()).fetchSemanticsNodes().isNotEmpty() &&
+                    compose.onAllNodesWithText(str(R.string.status_other_addresses))
+                        .fetchSemanticsNodes().isNotEmpty()
             }
 
-            compose.onNodeWithText(str(R.string.status_other_addresses)).assertExists()
             compose.onNodeWithText("192.168.43.1", substring = true).assertExists()
 
             compose.onNodeWithTag("action_button").performScrollTo().performClick()
