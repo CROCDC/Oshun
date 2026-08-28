@@ -1,202 +1,230 @@
-# Fuentes de datos AIS: qué hay, cómo cobran, y qué patrón las hace viables
+# Fuentes de datos AIS para Oshun
 
-Evaluación para el puente Oshun. **27/08/2026**, segunda ronda de investigación.
+Investigación para decidir de dónde salen los barcos que el puente le pasa a Navionics.
+**27/08/2026**, cuarta ronda.
 
-> **Historial de correcciones.** La primera versión descartó lo pago con una cuenta viciada
-> (asumía *polling* cada 30 s). La segunda encontró que lo que decide es la unidad de cobro.
-> Esta tercera agrega dos hallazgos que vuelven a mover la conclusión: un modelo comercial que
-> no había mirado, y la forma de medir la cobertura **sin salir al agua**.
+> **Historial.** (1) Descarté lo pago con una cuenta viciada — polling cada 30 s. (2) Lo que
+> decide no es el precio sino la unidad de cobro. (3) Hay un tercer modelo: suscripción por
+> área. (4) **Esta ronda:** hay una fuente oficial argentina, y el teléfono puede ser el
+> receptor.
+
+---
+
+## Resumen: hay cuatro caminos, no dos
+
+| Camino | Qué es | Costo | Anda sin internet |
+|---|---|---|---|
+| **A. Internet gratis** | aisstream (implementado) | $0 | ❌ |
+| **B. Internet pago** | VesselAPI, Data Docked, feeds crudos | USD 8 → cotización | ❌ |
+| **C. Oficial argentina** | Servidor Nacional AIS de Prefectura | Gratis, con registro | ❌ |
+| **D. Receptor propio** | **el mismo teléfono + un dongle** | **USD ~40** una vez | ✅ |
+
+**El camino D es nuevo en esta ronda y probablemente sea el mejor.** Ver §5.
 
 ---
 
 ## 1. Los tres modelos comerciales
 
-No son dos, son tres. Y el tercero es el que mejor encaja.
-
-| Modelo | Quién | El costo escala con… | Para nosotros |
+| Modelo | Quién | Escala con… | Para nosotros |
 |---|---|---|---|
-| **Por posición / por barco devuelto** | VesselFinder *Vessels*, VT Explorer *Vessels*, Datalastic | frecuencia **×** barcos | 💀 Peor caso: el Mitre está lleno |
-| **Por llamada, cuota mensual** | VesselAPI, Data Docked | frecuencia, nada más | ✅ Barato y predecible |
-| **Suscripción por área** | VT Explorer *LiveData*, VesselFinder *raw NMEA* | tamaño del área y densidad de tráfico (tarifa fija) | ⭐ El calce perfecto — precio por cotización |
-| *(Sin modelo)* | aisstream | nada | ✅ Gratis |
+| **Por posición / barco devuelto** | VesselFinder *Vessels*, VT Explorer *Vessels*, Datalastic | frecuencia **×** barcos | 💀 El Mitre está lleno |
+| **Por llamada** | VesselAPI, Data Docked | frecuencia | ✅ Barato y predecible |
+| **Suscripción por área** | VT Explorer *LiveData*, VesselFinder *raw NMEA* | tamaño de área y densidad (tarifa fija) | ⭐ Calce perfecto, precio a cotizar |
 
-### El calce perfecto, que probablemente no podamos pagar
+### El calce perfecto que probablemente no podamos pagar
 
-**VesselFinder vende un feed AIS crudo por TCP/UDP**, filtrable **por área**, con *downsampling*
-para bajar el ancho de banda, en formato NMEA conforme a la especificación AIS — o sea
-`!AIVDM` tal cual sale de un receptor.
+**VesselFinder vende un feed crudo por TCP/UDP filtrable por área**, en NMEA conforme a la
+especificación AIS — `!AIVDM` tal como sale de un receptor. Con eso, la app **no necesitaría
+parser ni encoder**: retransmitiría bytes. VT Explorer ofrece lo mismo con *LiveData*.
 
-Si tuviéramos eso, la app **no necesitaría ni el parser ni el encoder**: sería *retransmitir los
-bytes* a Navionics. Todo el trabajo de decodificar JSON y volver a armar los bits binarios
-—que es la parte más delicada de lo que ya construimos— se volvería innecesario.
-
-VT Explorer ofrece lo equivalente con su *LiveData API*: suscripción de tarifa fija según
-tamaño de área y densidad.
-
-**La contra:** ambos cotizan a pedido, según área, cantidad de estaciones y densidad de
-tráfico. Es tarifa comercial, casi seguro fuera de escala para un velero. Pero **pedir la
-cotización es gratis**, y si el número es razonable es la mejor arquitectura posible.
+Ambos cotizan a pedido según área, estaciones y densidad. Es tarifa comercial, pero preguntar
+es gratis.
 
 ---
 
-## 2. Patrones de consulta, ordenados por potencia
+## 2. Patrones de consulta
 
-**El radio es la palanca más fuerte** (y la menos obvia): los barcos crecen con el *área*, o
-sea con el **cuadrado** del radio. Bajar de 12 a 6 millas no baja el costo a la mitad, lo baja
-**a la cuarta parte**. Y a 6 M un buque a 20 nudos todavía da **18 minutos** de aviso: para
-conciencia situacional, que es lo único que este feed puede dar honestamente, sobra.
+**El radio es la palanca más fuerte:** los barcos crecen con el **cuadrado** del radio. De 12 a
+6 millas el costo cae **a la cuarta parte**, y a 6 M un buque a 20 nudos todavía da **18
+minutos** de aviso. Después: sólo mientras se transmite (ya es el diseño), la cadencia (cada 5
+min en vez de 30 s = 10× más barato), sólo en movimiento, y el piso: un botón manual.
 
-Después: **sólo mientras se transmite** (ya es el diseño), **la cadencia** (lineal: cada 5 min
-en vez de cada 30 s es 10× más barato), **sólo en movimiento** (fondeado la foto no cambia) y
-el piso de todo, un **botón manual "traer barcos ahora"**.
+Salida de 6 h, suponiendo ~20 barcos en 12 M y ~6 en 6 M (**estimación mía**, no medida):
 
-### La cuenta, salida de 6 horas
-
-Supuestos: ~20 barcos dentro de 12 M en el Mitre, ~6 dentro de 6 M. **Estimaciones mías**, no
-medidas — el número real lo vas a ver en la app.
-
-| Patrón | Consultas | Por barco (VesselFinder, €0,033) | Por llamada (Data Docked, 10 cr) | Por llamada (VesselAPI) |
+| Patrón | Consultas | Por barco (€0,033) | Data Docked (10 cr/llamada) | VesselAPI (1 llamada) |
 |---|---|---|---|---|
-| Continuo 30 s, 12 M | 720 | 14.400 cr → **€475** 💀 | 7.200 cr | 720 |
-| Cada 2 min, 12 M | 180 | 3.600 cr → **€119** | 1.800 cr | 180 |
-| Cada 5 min, 12 M | 72 | 1.440 cr → **€47,5** | 720 cr | 72 |
-| **Cada 5 min, 6 M** | 72 | 432 cr → **€14,3** | 720 cr | 72 |
-| Manual, 10 consultas | 10 | 200 cr → **€6,6** | 100 cr | 10 |
+| Continuo 30 s, 12 M | 720 | **€475** 💀 | 7.200 cr | 720 |
+| Cada 5 min, 12 M | 72 | **€47,5** | 720 cr | 72 |
+| **Cada 5 min, 6 M** | 72 | **€14,3** | 720 cr | 72 |
+| Manual, 10 consultas | 10 | **€6,6** | 100 cr | 10 |
 
-Traducido a salidas por mes:
-
-- **Data Docked Deckhand (€80/mes, 6.000 cr):** ~**8 salidas** cada 5 min · **60** en manual.
-- **VesselAPI free (150 llamadas/mes):** **2 salidas** cada 5 min · **15** en manual — **gratis**.
-- **Datalastic Starter (€199/mes, 20.000 cr):** ~46 salidas con radio 6 M · pero pagando €199.
-
-Con cobro por llamada, **bajar el radio ya no ahorra plata** — sólo baja el ruido en la carta.
-El tráfico del canal deja de ser un problema económico.
+Salidas por mes: **Data Docked** (€80, 6.000 cr) ~8 automáticas / 60 manuales · **VesselAPI
+free** (150 llamadas) 2 automáticas / 15 manuales, **gratis** · **Datalastic** (€199) ~46 con
+radio 6 M.
 
 ---
 
-## 3. Los proveedores
+## 3. Proveedores de internet
 
 | Fuente | Cobra | Precio | Área | Streaming | Veredicto |
 |---|---|---|---|---|---|
 | **aisstream.io** | nada | **Gratis** | ✅ bbox | ✅ WebSocket | **Implementado.** Cobertura a verificar |
-| **VesselAPI** | por llamada | Gratis 150/mes · desde **USD 7,99** | ✅ bbox 4° / radio 100 km | ❌ REST + webhooks | **Mejor candidato pago.** El free tier alcanza para probarlo |
-| **Data Docked** | **10 cr por llamada de área** ✅ confirmado | Gratis ~100 cr · **€80/mes** 6.000 cr | ✅ radio ≤50 km | ❌ REST | Viable. Caro al lado de VesselAPI |
-| **VesselFinder** *raw NMEA* | suscripción por área | **Cotización** | ✅ | ✅ TCP/UDP | ⭐ Arquitectura ideal. Pedir precio |
-| **VT Explorer** *LiveData* | suscripción por área | **Cotización** | ✅ | ❌ | Equivalente al anterior |
-| **Datalastic** | por barco devuelto | €9 trial · **€199/mes** · ilimitado €679 | ✅ | ❌ | El modelo juega en contra |
-| **VesselFinder / VT Explorer** *Vessels* | por posición | **€330** / 10.000 cr (12 meses) | ✅ | ❌ | Sólo patrón manual |
-| **AISHub** | aportar receptor propio | "Gratis" | ✅ | ❌ | Bloqueado en la práctica |
-| **MarineTraffic** (Kpler) | enterprise | **Sin tarifa pública** | ✅ | ❌ | Descartado |
-| **Receptor físico** | hardware | **USD 100–300** una vez | n/a | VHF directo | **La única sin internet.** Ver §6 |
+| **VesselAPI** | por llamada | Gratis 150/mes · desde **USD 7,99** | ✅ bbox 4° / radio 100 km | ❌ | **Mejor candidato pago** |
+| **Data Docked** | **10 cr/llamada** (confirmado) | Gratis ~100 cr · **€80/mes** | ✅ radio ≤50 km | ❌ | Viable, caro al lado del anterior |
+| **VesselFinder** *raw NMEA* | suscripción de área | Cotización | ✅ | ✅ TCP/UDP | ⭐ Ideal. Preguntar |
+| **VT Explorer** *LiveData* | suscripción de área | Cotización | ✅ | ❌ | Equivalente |
+| **Datalastic** | por barco | €199/mes · ilimitado €679 | ✅ | ❌ | El modelo juega en contra |
+| **VesselFinder / VT Explorer** *Vessels* | por posición | €330 / 10.000 cr | ✅ | ❌ | Sólo manual |
+| **AISHub** | aportar receptor | "Gratis" | ✅ | ❌ | Exige montar estación |
+| **aisfriends** | ¿? | Gratis | parcial | HTTP stream | Orientado a quien aporta estaciones |
+| **MarineTraffic** · **FleetMon** | enterprise | **Sin tarifa pública** | ✅ | ❌ | Descartados |
 
-Notas: Data Docked cobra **10 créditos por request** en *Vessels by Area*, **plano, sin importar
-cuántos barcos vuelvan** — eso lo saca de la lista negra. Datalastic, en cambio, descuenta según
-la cantidad de barcos encontrados (tope 500). VesselFinder y VT Explorer comparten modelo de
-créditos (1 terrestre / 10 satelital) y ambos venden aparte una suscripción de área.
+**Nota de mercado:** Kpler compró **MarineTraffic** *y* **FleetMon**. Esa consolidación explica
+por qué desaparecieron las tarifas públicas: los dos nombres más conocidos dejaron de vender a
+usuarios chicos.
 
----
+### Gobiernos: gratis, pero de otro hemisferio
 
-## 4. Cobertura: se puede medir **hoy, sin salir al agua**
-
-**¿Tiene aisstream cobertura del Canal Mitre?** Sigo sin saberlo: el proxy de este entorno
-bloquea `aisstream.io`, `datalastic.com`, `datadocked.com` y `vesselapi.com`, así que **todo
-este documento sale de resultados de búsqueda, no de las páginas de los proveedores**.
-
-Pero hay una forma de contestarlo sin mover el barco. **La suscripción es un cuadro de ~18
-millas alrededor del teléfono** (12 de alcance + 6 de margen), y los targets que se transmiten
-son los de menos de 12 M. Desde Buenos Aires o el conurbano ribereño, ese cuadro **ya cubre la
-rada y el canal**.
-
-O sea: prendé el feed **en tierra**, cerca del río, y mirá `Targets AIS: N` en la tarjeta de
-estado. No hace falta Navionics ni salir a navegar. Si en la rada de Buenos Aires —donde
-siempre hay buques fondeados— el contador da 0 con el feed conectado, esa red no sirve acá, y
-lo sabés en diez minutos desde el auto.
-
-Pasos: prendé **Barcos AIS (internet)** con la key, modo prueba apagado, transmitiendo. Mirá el
-registro (**"Feed AIS conectado"**) y después el contador. Repetirlo navegando confirma, pero
-la primera lectura ya te dice casi todo.
+Noruega (**BarentsWatch/Kystverket**) y Finlandia (**Digitraffic**) publican AIS abierto y
+gratuito con API. Cobertura: sus propias costas. **Ninguno sirve acá** — pero confirma que el
+modelo existe, lo que lleva a la pregunta siguiente.
 
 ---
 
-## 5. Latencia, y una consecuencia de diseño que hay que anotar
+## 4. La fuente oficial argentina
 
-La demora importa más que el precio para el encuadre de seguridad, y **los modelos no son
-iguales**:
+**Prefectura Naval opera un Servidor Nacional AIS** (`ais.prefecturanaval.gob.ar`): tráfico
+**marítimo y fluvial** en tiempo real, alimentado por una red de **20 estaciones receptoras**
+sobre el litoral y la Antártida, e integrado con LRIT, SICAP, la red **CAMAS del Mercosur** y
+AIS satelital.
 
-- **Streaming** (aisstream, feed crudo): llega cuando llega el mensaje. La demora es la de la
-  red de agregación, del orden de segundos.
+- **Es gratis** para usuarios registrados.
+- El registro es para **personas físicas (DNI) vinculadas a la actividad marítima, fluvial y
+  portuaria**. Con título náutico y una embarcación matriculada, calificás en principio —
+  vale la pena intentarlo.
+- **Casi con certeza es un visor web, no una API.** No encontré mención de feed NMEA ni de
+  endpoints. Y las condiciones dicen que el servicio puede cambiar sin aviso.
+
+**Para qué sirve igual:** es **la verificación independiente de la cobertura**. Si el visor de
+Prefectura muestra doce buques en el Mitre y la app te muestra cero, el problema es la red de
+aisstream y no el río. Eso convierte una sospecha en un diagnóstico.
+
+**Lo que no hay que hacer:** scrapearlo. Es un sistema del Estado con condiciones de uso
+explícitas y usuarios registrados con DNI. Si querés datos, el camino es preguntarles si
+publican un feed.
+
+---
+
+## 5. El teléfono como receptor AIS ⭐
+
+El hallazgo más fuerte de esta ronda. **AIS-catcher for Android** convierte tu Android en un
+**receptor AIS de doble canal** con un dongle **RTL-SDR** y un cable **OTG**. Sin drivers
+extra, y —lo que importa— **funciona sin internet**. Saca **NMEA por UDP/TCP/HTTP**, que es
+exactamente lo que hablamos.
+
+| | |
+|---|---|
+| **Costo** | Dongle RTL-SDR **USD ~30–40** + antena VHF + cable OTG |
+| **Internet** | **No hace falta** |
+| **Demora** | Cero: es la señal de VHF directa |
+| **Ve** | Todo lo que transmita AIS a la vista, incluido lo que ninguna estación captó |
+| **Contra** | Ocupa el puerto USB → adiós cable a la tablet, hay que usar hotspot |
+| **Contra** | La app salió del Play Store (regla de datos personales del desarrollador); el APK se baja de su GitHub |
+| **Contra** | La antena manda: con una berreta vas a ver poco. Una VHF marina decente cambia todo |
+
+### Cómo encaja con Oshun
+
+```
+RTL-SDR ──USB OTG──▶ AIS-catcher ──UDP a 127.0.0.1──▶ Oshun ──TCP──▶ Navionics
+   (VHF)              (mismo teléfono)                  (mezcla con el GPS)
+```
+
+AIS-catcher ya sabe mandar NMEA por UDP a apps de plotteo. Nosotros lo recibiríamos en
+**localhost**, lo mezclaríamos con nuestro `$GPRMC` y saldría **todo por un solo socket** — que
+es justamente lo que Navionics necesita, porque empareja **un** dispositivo.
+
+Eso implica una feature concreta y chica: **entrada NMEA externa por UDP**. Y es la misma pieza
+que haría falta para el feed crudo de VesselFinder (§1), así que construir una deja la otra
+casi hecha.
+
+**Por qué esto le gana a cualquier API:** no depende de que haya señal, ni de que una red
+voluntaria tenga un receptor cerca, ni de que un proveedor siga existiendo. Y cuesta una vez.
+
+---
+
+## 6. Medir la cobertura **hoy, sin salir al agua**
+
+La suscripción es un cuadro de **~18 millas alrededor del teléfono** y se transmiten los
+targets de menos de 12 M. Desde Buenos Aires o el conurbano ribereño **eso ya cubre la rada y
+el canal**.
+
+Prendé **Barcos AIS (internet)** con la key, modo prueba apagado, transmitiendo. Mirá el
+registro (**"Feed AIS conectado"**) y después **`Targets AIS: N`** en la tarjeta de estado. No
+hace falta Navionics ni el barco. Si en la rada —donde siempre hay buques fondeados— da 0 con
+el feed conectado, esa red no sirve acá, y lo sabés en diez minutos.
+
+Cruzalo con el visor de Prefectura (§4) y tenés diagnóstico, no sospecha.
+
+---
+
+## 7. Demora, y una consecuencia de diseño anotada
+
+- **Streaming** (aisstream, feed crudo, receptor propio): segundos, o cero.
 - **REST**: cada consulta devuelve *la última posición conocida*, que ya puede tener minutos.
-  Con consultas cada 5 minutos, la edad del dato en pantalla es **la demora del proveedor más
-  hasta 5 minutos nuestros**. Se suman.
+  Con consultas cada 5 min, la edad en pantalla es **la demora del proveedor + hasta 5 minutos
+  nuestros**. Se suman.
 
-**Consecuencia concreta para el código:** hoy sellamos cada target con **nuestro** reloj
-(`reportedAtMillis = ahora`), que es lo correcto para un stream — el mensaje acaba de llegar.
-Con un proveedor REST eso sería **una mentira**: un dato de hace 8 minutos entraría como
-recién nacido y el vencimiento de 6 minutos nunca lo descartaría. Si alguna vez migramos a
-REST, hay que tomar la marca de tiempo **del proveedor** y no la nuestra. Está anotado acá
-para que no se pierda.
+**Consecuencia para el código:** hoy sellamos cada target con **nuestro** reloj, correcto para
+un stream — el mensaje acaba de llegar. Con REST sería **una mentira**: un dato de hace 8
+minutos entraría como recién nacido y el vencimiento de 6 minutos nunca lo descartaría. Si
+migramos a REST, la marca de tiempo tiene que venir **del proveedor**.
 
 ---
 
-## 6. La opción que no es una API: receptor AIS propio
+## 8. Recomendación
 
-Resuelve el problema que **ninguna** API resuelve. Un receptor (dAISy, Quark-elec, Digital
-Yacht; **USD 100–300**) escucha el VHF directo: **sin internet**, en **tiempo real**, y **ve
-todo lo que transmite cerca tuyo** — incluido lo que ninguna estación terrestre captó.
+1. **Medí aisstream desde tierra esta semana.** Diez minutos, gratis, contesta la pregunta.
+2. **Registrate en el Servidor Nacional AIS de Prefectura.** Gratis, y te da la vara contra la
+   cual comparar.
+3. **Si aisstream cubre el Mitre:** quedate. Gratis, streaming, ya hecho.
+4. **Si no cubre pero hay tráfico:** probá **VesselAPI free** (150 llamadas), y si convence,
+   USD 7,99/mes con radio 6 M, cada 5 min, sólo transmitiendo y en movimiento.
+5. **Si querés que ande sin internet —que es cuando el AIS más importa— comprá el dongle
+   RTL-SDR (USD ~40) y una antena decente.** Es la respuesta estructural, cuesta menos que dos
+   meses de cualquier API, y me toca agregar la entrada NMEA por UDP.
+6. **Preguntá el precio del feed crudo** de VesselFinder/VT Explorer. Gratis preguntar.
+7. **Descartados:** MarineTraffic y FleetMon (Kpler, sin tarifa pública), Datalastic (€199 y
+   cobra por barco), AISHub y aisfriends (exigen aportar estación).
 
-El puente ya está en forma de multiplexarlo: leería `!AIVDM` del receptor y lo mandaría por el
-mismo socket que la posición, igual que hoy con los simulados y los de internet. Y es
-exactamente la misma arquitectura que necesitaría el feed crudo de VesselFinder (§1), así que
-construir una de las dos deja la otra casi hecha.
+### Qué habría que construir
 
-Pendiente: el teléfono tiene un solo puerto USB, así que un receptor USB compite con el cable a
-la tablet. Habría que ver uno con Wi-Fi, o volver a hotspot.
-
----
-
-## 7. Recomendación
-
-1. **Medí aisstream desde tierra, esta semana.** Diez minutos, gratis, y contesta la única
-   pregunta abierta.
-2. **Si la cobertura sirve:** quedate. Es gratis, es streaming y ya está hecho.
-3. **Si falla pero hay tráfico en la zona:** probá **VesselAPI con su free tier** (150 llamadas
-   alcanzan para dos salidas). Si convence, USD 7,99/mes con el patrón: **radio 6 M, cada 5
-   minutos, sólo transmitiendo, sólo en movimiento**, más botón manual.
-4. **Pedí la cotización del feed crudo de VesselFinder / VT Explorer.** Es gratis preguntar y
-   es la mejor arquitectura posible. Si vuelve con un número de tres cifras mensuales, cerrás
-   el mail y listo.
-5. **Si no hay cobertura terrestre en la zona:** ninguna API te salva — **receptor físico**.
-6. **Descartados:** MarineTraffic (sin tarifa pública), Datalastic (€199 y cobra por barco),
-   AISHub (exige montar estación).
-
-### Qué habría que construir para un proveedor REST
-
-La mitad cara ya está hecha y **no depende de la fuente**: el modelo `AisTarget`, la tabla con
-vencimiento y filtro por distancia (`AisTraffic`) y el encoder a `!AIVDM`. Migrar es **un
-cliente nuevo, un parser nuevo y el cambio de marca de tiempo de §5**: un día de trabajo sin
-tocar lo probado.
+- **Para un proveedor REST:** cliente + parser nuevos y el cambio de marca de tiempo de §7. Un
+  día. El modelo `AisTarget`, la tabla `AisTraffic` con vencimiento y el encoder `!AIVDM` se
+  reusan tal cual.
+- **Para el receptor propio (o el feed crudo):** entrada NMEA externa por UDP y multiplexado.
+  Más simple todavía: las sentencias ya vienen armadas, **ni siquiera se decodifican**.
 
 ---
 
-## 8. Qué no pude verificar
+## 9. Qué no pude verificar
 
-- **La cobertura real** de cualquiera de estas redes en el Río de la Plata. Se mide con la app.
-- Las **cuotas exactas** de los planes pagos de VesselAPI (sólo confirmé el free de 150/mes y
-  el piso de USD 7,99).
-- El **precio** de las suscripciones por área de VesselFinder y VT Explorer: sólo por cotización.
-- Si Datalastic mantiene el plan Experimenter (80.000 créditos) y a qué precio.
+El proxy de este entorno bloquea `aisstream.io`, `datalastic.com`, `datadocked.com`,
+`vesselapi.com` y `argentina.gob.ar`, así que **todo salió de resultados de búsqueda, no de las
+páginas de los proveedores**. Queda abierto:
+
+- La **cobertura real** de cualquiera de estas redes en el Río de la Plata. Se mide con la app.
+- Si Prefectura da **algún acceso de datos** o sólo el visor, y si un deportista puede registrarse.
+- Las **cuotas** de los planes pagos de VesselAPI (confirmé el free de 150/mes y el piso de USD 7,99).
+- El **precio** de las suscripciones por área de VesselFinder y VT Explorer.
+- Qué antena hace falta para que el RTL-SDR rinda en el río.
 - Todos los precios: se mueven, y varios proveedores dejaron de publicarlos.
 
 ---
 
 ## Fuentes (27/08/2026)
 
-- [aisstream.io — Coverage](https://aisstream.io/coverage)
-- [VesselAPI — Pricing](https://vesselapi.com/pricing) · [AIS Data API](https://vesselapi.com/ais-data-api) · [Docs](https://vesselapi.com/docs)
-- [Data Docked — Pricing](https://datadocked.com/pricing) · [Vessels by Area](https://datadocked.com/vessels-by-area-api) · [API Reference](https://datadocked.com/api-reference)
-- [Datalastic — Pricing](https://datalastic.com/pricing/) · [API Reference](https://datalastic.com/api-reference/)
-- [VesselFinder — Real-time AIS data (NMEA/TCP)](https://www.vesselfinder.com/realtime-ais-data) · [Área personalizada](https://www.vesselfinder.com/vessel-positions-custom-area-api) · [Vessel Positions API](https://www.vesselfinder.com/vessel-positions-api)
-- [VT Explorer — AIS Data API](https://www.vtexplorer.com/ais-data-en/) · [LiveData (área)](https://api.vtexplorer.com/docs/livedata.html)
-- [AISHub — Join us](https://www.aishub.net/join-us) · [API](https://www.aishub.net/api)
-- [MarineTraffic — Set up your API services](https://help.marinetraffic.com/hc/en-us/articles/205115108-Set-up-your-API-Services)
-- [Prefectura Naval — Río de la Plata](https://www.argentina.gob.ar/prefecturanaval/avisos/rio_de_la_plata)
+**Internet:** [aisstream](https://aisstream.io/coverage) · [VesselAPI](https://vesselapi.com/pricing) · [Data Docked](https://datadocked.com/pricing) ([área](https://datadocked.com/vessels-by-area-api)) · [Datalastic](https://datalastic.com/pricing/) · [VesselFinder NMEA crudo](https://www.vesselfinder.com/realtime-ais-data) · [VT Explorer LiveData](https://api.vtexplorer.com/docs/livedata.html) · [AISHub](https://www.aishub.net/join-us) · [aisfriends](https://www.aisfriends.com/docs/api/v1) · [MarineTraffic](https://help.marinetraffic.com/hc/en-us/articles/205115108-Set-up-your-API-Services) · [FleetMon](https://datarade.ai/data-providers/fleetmon/profile)
+
+**Oficiales:** [PNA — Servidor Nacional AIS](https://www.argentina.gob.ar/prefecturanaval/ais) · [Condiciones](https://ais.prefecturanaval.gob.ar/condiciones) · [Red de 20 estaciones](https://www.argentina.gob.ar/noticias/una-red-de-20-estaciones-receptoras-del-sistema-de-identificacion-automatica-monitorean) · [Kystverket](https://www.kystverket.no/en/sea-transport-and-ports/ais/access-to-ais-data/) · [Digitraffic](https://www.digitraffic.fi/en/marine-traffic/ais/)
+
+**Receptor propio:** [AIS-catcher for Android](https://github.com/jvde-github/AIS-catcher-for-Android) · [AIS-catcher](https://github.com/jvde-github/AIS-catcher) · [RTL-SDR: decoder AIS para Android](https://www.rtl-sdr.com/a-new-ais-decoder-for-the-rtl-sdr-on-android/) · [AIS + OpenCPN en un velero](https://www.rtl-sdr.com/using-ais-share-opencpn-and-an-rtl-sdr-on-a-sailboat/) · [Guía de armado](https://www.worldwideais.org/post/how-to-set-up-sdr-ais-receiver-ais-catcher)
