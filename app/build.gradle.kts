@@ -123,6 +123,8 @@ dependencies {
     testImplementation("androidx.test:core:1.6.1")
     testImplementation("androidx.test.ext:junit:1.2.1")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    // Lets the AIS feed test run its own WebSocket server: no API key, no internet.
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 
     // Instrumented tests (emulator)
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

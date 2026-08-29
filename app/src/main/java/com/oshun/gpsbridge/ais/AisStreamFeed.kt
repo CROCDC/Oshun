@@ -14,6 +14,7 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The live connection to the AIS feed: one WebSocket, a subscription that follows the boat,
@@ -30,7 +31,7 @@ class AisStreamFeed(
     private val apiKey: String,
     private val scope: CoroutineScope,
     private val onUpdate: (AisTraffic.Update) -> Unit,
-    private val onConnected: (Boolean) -> Unit,
+    private val onConnected: (connected: Boolean, detail: String) -> Unit,
     private val onRaw: (String) -> Unit = {},
 ) {
 
@@ -75,7 +76,7 @@ class AisStreamFeed(
 
     private fun connect(centre: Position) {
         if (!running || socket != null) return
-        val request = Request.Builder().url(AisSubscription.URL).build()
+        val request = Request.Builder().url(AisSubscription.url).build()
         socket = client.newWebSocket(request, Listener(centre))
     }
 
@@ -99,10 +100,13 @@ class AisStreamFeed(
 
     private inner class Listener(private val centre: Position) : WebSocketListener() {
 
+        /** One drop per connection: a clean close arrives twice, and it is one event. */
+        private val dropped = AtomicBoolean(false)
+
         override fun onOpen(webSocket: WebSocket, response: Response) {
             attempt = 0
             subscribe(webSocket, lastKnown ?: centre)
-            onConnected(true)
+            onConnected(true, "")
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
@@ -112,13 +116,39 @@ class AisStreamFeed(
             AisStreamMessages.parse(text, System.currentTimeMillis())?.let(onUpdate)
         }
 
-        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-            onConnected(false)
-            scheduleReconnect()
+        /**
+         * The server is closing. We have to answer with a close of our own — until we do, the
+         * socket sits half-open, `onClosed` never comes, and the feed stays dead without ever
+         * saying so or reconnecting.
+         */
+        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+            webSocket.close(NORMAL_CLOSURE, null)
+            drop(closeDetail(code, reason))
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-            onConnected(false)
+            drop(closeDetail(code, reason))
+        }
+
+        /**
+         * Why it dropped is the whole diagnosis, and it used to be thrown away.
+         *
+         * A rejected key does not look like bad coverage: the socket opens, the server says no
+         * and closes, and the app reconnects for ever. The HTTP code and the close reason are
+         * what tell those apart, so they go into the log verbatim.
+         */
+        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            val http = response?.let { "HTTP ${it.code} " }.orEmpty()
+            drop(http + (t.message ?: t::class.java.simpleName))
+        }
+
+        private fun closeDetail(code: Int, reason: String): String =
+            if (reason.isBlank()) "close $code" else "close $code: $reason"
+
+        private fun drop(detail: String) {
+            if (!dropped.compareAndSet(false, true)) return
+            if (!running) return // we are the ones who closed it
+            onConnected(false, detail)
             scheduleReconnect()
         }
     }

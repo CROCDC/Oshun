@@ -18,7 +18,14 @@ import org.json.JSONObject
  */
 object AisSubscription {
 
-    const val URL = "wss://stream.aisstream.io/v0/stream"
+    const val DEFAULT_URL = "wss://stream.aisstream.io/v0/stream"
+
+    /**
+     * Overridable so a test can point the feed at a server it runs itself. That is the only
+     * honest way to exercise this end to end: a live third-party service would need a real
+     * key in CI, and a key in CI is a key published.
+     */
+    var url: String = DEFAULT_URL
 
     /**
      * How far past the range we actually draw the box reaches. Vessels are then already

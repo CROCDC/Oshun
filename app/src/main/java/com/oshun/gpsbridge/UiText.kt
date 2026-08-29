@@ -32,11 +32,16 @@ internal fun eventLabel(event: LogEvent): String = when (event.kind) {
     EventKind.DELIVERY -> outcomeLabel(event.outcome)
     EventKind.SIMULATION -> stringResource(R.string.log_simulation)
     EventKind.AIS_FEED -> when {
-        event.detail == "up" -> stringResource(R.string.log_ais_up)
+        event.detail == GpsBridgeService.UP -> stringResource(R.string.log_ais_up)
         // The first message, kept verbatim: what the feed actually sends is the one thing that
         // cannot be worked out from here when nothing appears on the chart.
         event.detail.startsWith(GpsBridgeService.RAW_PREFIX) ->
             stringResource(R.string.log_ais_sample, event.detail.removePrefix(GpsBridgeService.RAW_PREFIX))
+        // The reason the server gave, when it gave one: a rejected key and empty water are
+        // indistinguishable without it.
+        event.detail.startsWith(GpsBridgeService.DOWN_PREFIX) &&
+            event.detail.length > GpsBridgeService.DOWN_PREFIX.length ->
+            stringResource(R.string.log_ais_down_reason, event.detail.removePrefix(GpsBridgeService.DOWN_PREFIX))
         else -> stringResource(R.string.log_ais_down)
     }
     EventKind.FIX -> if (event.fixValid == true) {

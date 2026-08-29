@@ -363,14 +363,16 @@ class GpsBridgeService : Service() {
             scope = scope,
             onUpdate = { update -> rememberTarget(update) },
             onRaw = { raw -> onAisMessage(raw) },
-            onConnected = { connected ->
-                // Worth a line of its own: while the feed is down the chart keeps your own
-                // position and quietly stops showing anybody else's.
+            onConnected = { connected, detail ->
+                // Worth a line of its own, and worth the reason: while the feed is down the
+                // chart keeps your own position and quietly stops showing anybody else's — and
+                // a rejected key looks exactly like empty water unless the server's own words
+                // are written down.
                 EventLog.record(
                     LogEvent(
                         atMillis = System.currentTimeMillis(),
                         kind = EventKind.AIS_FEED,
-                        detail = if (connected) "up" else "down",
+                        detail = if (connected) UP else DOWN_PREFIX + detail,
                     ),
                 )
                 if (!connected) aisTargets = emptyMap()
@@ -719,6 +721,10 @@ class GpsBridgeService : Service() {
 
         /** Marks a log entry that carries a verbatim feed message rather than a state change. */
         const val RAW_PREFIX = "raw:"
+
+        /** The feed's state in the log: up, or down with whatever the server said on the way out. */
+        const val UP = "up"
+        const val DOWN_PREFIX = "down:"
 
         /** How often the message counter reaches the screen. */
         private const val AIS_COUNT_INTERVAL_MILLIS = 1_000L
