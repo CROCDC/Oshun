@@ -67,6 +67,12 @@ data class BridgeStatus(
     val batteryPercent: Int? = null,
     val currentDrawMilliAmp: Int? = null,
     val batteryDrainPerHour: Double? = null,
+    /**
+     * The traffic as the last batch saw it, for the log screen to hand to a human.
+     * [aisTargets] says how many vessels went out; this says which ones, which ones were
+     * filtered out and why, and what the sentences looked like.
+     */
+    val aisSnapshot: AisReport.Snapshot? = null,
 )
 
 /**
