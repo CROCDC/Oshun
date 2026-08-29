@@ -11,6 +11,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import okio.ByteString.Companion.encodeUtf8
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -84,6 +85,15 @@ class AisStreamFeedTest {
 
     private fun <T> LinkedBlockingQueue<T>.await(): T? = poll(10, TimeUnit.SECONDS)
 
+    private companion object {
+        val VESSEL = """
+            {"MessageType":"PositionReport",
+             "MetaData":{"MMSI":701000123,"ShipName":"RIO PARANA"},
+             "Message":{"PositionReport":{"UserID":701000123,"Latitude":-34.96,"Longitude":-57.56,
+                        "Sog":11.0,"Cog":120.0,"TrueHeading":121,"NavigationalStatus":0}}}
+        """.trimIndent()
+    }
+
     @Test
     fun subscribesWithTheKeyAndABoxAroundUs() {
         acceptConnection()
@@ -117,19 +127,34 @@ class AisStreamFeedTest {
         bridge.onOwnPosition(here)
         assertNotNull(subscriptions.await())
 
-        socket!!.send(
-            """
-            {"MessageType":"PositionReport",
-             "MetaData":{"MMSI":701000123,"ShipName":"RIO PARANA"},
-             "Message":{"PositionReport":{"UserID":701000123,"Latitude":-34.96,"Longitude":-57.56,
-                        "Sog":11.0,"Cog":120.0,"TrueHeading":121,"NavigationalStatus":0}}}
-            """.trimIndent(),
-        )
+        socket!!.send(VESSEL)
 
         assertNotNull("the message never reached us raw", raw.await())
         val update = targets.await() as AisTraffic.Update.Position
         assertEquals(701000123, update.target.mmsi)
         assertEquals("RIO PARANA", update.target.name)
+
+        bridge.stop()
+    }
+
+    @Test
+    fun aVesselInABinaryFrameBecomesATargetToo() {
+        // How the real aisstream sends everything. Listening only to text frames left the feed
+        // connected, subscribed and permanently silent — indistinguishable from empty water,
+        // which is why it survived so long.
+        acceptConnection()
+        val targets = LinkedBlockingQueue<AisTraffic.Update>()
+        val raw = LinkedBlockingQueue<String>()
+        val bridge = feed(onUpdate = { targets.put(it) }, onRaw = { raw.put(it) })
+        bridge.start()
+        bridge.onOwnPosition(here)
+        assertNotNull(subscriptions.await())
+
+        socket!!.send(VESSEL.encodeUtf8())
+
+        assertNotNull("the binary frame never reached us raw", raw.await())
+        val update = targets.await() as AisTraffic.Update.Position
+        assertEquals(701000123, update.target.mmsi)
 
         bridge.stop()
     }

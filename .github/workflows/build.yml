@@ -123,6 +123,9 @@ jobs:
 
   apk:
     name: Build APK
+    # A pull request builds the same commit its own branch already pushed, so opening one
+    # would assemble the APK twice for nothing.
+    if: github.event_name != 'pull_request'
     needs: [unit, instrumented]
     runs-on: ubuntu-latest
     permissions:
@@ -159,8 +162,11 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
+      # Only develop moves the "latest" download. Every branch still gets its APK as a
+      # workflow artifact above; publishing those would hand anyone following the Releases
+      # link an unreviewed build, which is what the link is trusted not to be.
       - name: Publish APK to Releases (latest)
-        if: github.event_name == 'push'
+        if: github.ref == 'refs/heads/develop'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: debug-latest

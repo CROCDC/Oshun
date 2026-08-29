@@ -13,6 +13,7 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import okio.ByteString
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -136,6 +137,17 @@ class AisStreamFeed(
             // which is the difference between "no coverage" and "our parser is wrong".
             onRaw(text)
             AisStreamMessages.parse(text, System.currentTimeMillis())?.let(onUpdate)
+        }
+
+        /**
+         * The feed sends its JSON in binary frames, not text ones.
+         *
+         * Overriding only the text overload is a deafness with no symptom to follow: the socket
+         * opens, the subscription is accepted, nothing ever closes, and not one vessel arrives
+         * — which reads exactly like empty water.
+         */
+        override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+            onMessage(webSocket, bytes.utf8())
         }
 
         /**

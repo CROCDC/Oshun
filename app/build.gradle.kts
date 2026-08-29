@@ -99,6 +99,19 @@ android {
 tasks.withType<Test>().configureEach {
     exclude("**/AisStreamMessagesTest*")
     exclude("**/AisSubscriptionTest*")
+
+    // The live feed test talks to the real aisstream.io with a real key, so it is opt-in and
+    // never part of a normal run: no test may depend on the network, and CI has no key. Its
+    // printed capture is the reason to run it, so that run shows stdout.
+    if (project.hasProperty("liveAis")) {
+        testLogging { showStandardStreams = true }
+        // The test JVM is forked and inherits nothing, so the water to look at has to be
+        // handed over explicitly: -PaisLat / -PaisLon.
+        (project.findProperty("aisLat") as String?)?.let { systemProperty("aisLive.lat", it) }
+        (project.findProperty("aisLon") as String?)?.let { systemProperty("aisLive.lon", it) }
+    } else {
+        exclude("**/AisStreamLiveTest*")
+    }
 }
 
 dependencies {
