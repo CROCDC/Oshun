@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,6 +58,9 @@ enum class Destination(
 ) {
     /** Start/stop, network, transports, status: the working screen. */
     BRIDGE(R.string.app_name, R.string.nav_bridge, Icons.Filled.Home, "nav_bridge"),
+
+    /** The internet AIS feed: its key, and the warning about what it does not show. */
+    AIS(R.string.nav_ais, R.string.nav_ais, Icons.Filled.Place, "nav_ais"),
 
     /** The simulated boat and its AIS targets, off the working screen and opt-in. */
     TEST_DATA(R.string.nav_test_data, R.string.nav_test_data, Icons.Filled.PlayArrow, "nav_test_data"),
@@ -162,6 +166,7 @@ fun OshunShell() {
                     onOpenTestData = { destination = Destination.TEST_DATA },
                     modifier = content,
                 )
+                Destination.AIS -> AisFeedScreen(settings = settings, modifier = content)
                 Destination.TEST_DATA -> TestDataScreen(settings = settings, modifier = content)
                 Destination.VERSION -> VersionScreen(modifier = content)
             }

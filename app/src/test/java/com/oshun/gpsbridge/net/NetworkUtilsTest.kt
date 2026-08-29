@@ -110,4 +110,30 @@ class NetworkUtilsTest {
         NetworkUtils.hotspotAddress()
         NetworkUtils.localIpAddress()
     }
+
+    @Test
+    fun reportsEveryAddressTheTabletCouldBeOn() {
+        // The case this exists for: tethering left on while the tablet sits on the hotspot.
+        // Only one address can be advertised, so the other has to be visible rather than
+        // guessed at — pairing against the wrong one looks exactly like a dead bridge.
+        val both = NetworkUtils.addresses(listOf(wifi, hotspot, cable))
+        assertEquals(listOf(Link.CABLE, Link.HOTSPOT), both.map { it.link })
+        assertEquals("192.168.42.129", both.first().ipv4)
+        assertEquals("192.168.43.1", both.last().ipv4)
+    }
+
+    @Test
+    fun aLoneHotspotIsTheOnlyAddressReported() {
+        val only = NetworkUtils.addresses(listOf(wifi, hotspot))
+        assertEquals(1, only.size)
+        assertEquals(Link.HOTSPOT, only.single().link)
+    }
+
+    @Test
+    fun withNoLinkOfOurOwnItStillNamesTheNetworkWeAreOn() {
+        // Not good enough to sail with, but it is what a simulated run pairs against.
+        assertEquals(listOf(Link.OTHER), NetworkUtils.addresses(listOf(wifi)).map { it.link })
+        assertTrue(NetworkUtils.addresses(listOf(mobile)).isEmpty())
+        assertTrue(NetworkUtils.addresses(emptyList()).isEmpty())
+    }
 }

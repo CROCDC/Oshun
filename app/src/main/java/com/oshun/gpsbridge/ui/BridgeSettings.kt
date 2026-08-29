@@ -30,6 +30,9 @@ class BridgeSettings(saved: BridgeConfig) {
     var autoOffEnabled by mutableStateOf(saved.autoOffEnabled)
     var rawLogEnabled by mutableStateOf(saved.rawLogEnabled)
     var simulated by mutableStateOf(saved.simulated)
+    // The internet AIS feed. Its API key is deliberately not here: the config rides in
+    // intents and names itself in the CSV header, and a credential belongs in neither.
+    var aisEnabled by mutableStateOf(saved.aisEnabled)
 
     /** What the service is started with. An unfinished port falls back to the default. */
     fun toConfig(): BridgeConfig = BridgeConfig(
@@ -40,6 +43,7 @@ class BridgeSettings(saved: BridgeConfig) {
         autoOffEnabled = autoOffEnabled,
         rawLogEnabled = rawLogEnabled,
         simulated = simulated,
+        aisEnabled = aisEnabled,
     )
 
     private companion object {

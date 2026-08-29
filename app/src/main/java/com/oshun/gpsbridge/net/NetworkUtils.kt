@@ -18,6 +18,9 @@ enum class Link {
     OTHER,
 }
 
+/** One address the tablet can reach the phone on, and the kind of link it belongs to. */
+data class LinkAddress(val link: Link, val ipv4: String)
+
 /**
  * Works out how, and on which address, the tablet can actually reach the phone.
  *
@@ -25,9 +28,10 @@ enum class Link {
  * pairing over it appears to work — and then dies a few metres out, when the phone leaves
  * the access point's range and the address it advertised stops meaning anything.
  *
- * Two links survive leaving the mooring, and the cable is the better of them: it cannot lose
- * range, drop to a weak signal or be joined by anyone else. So the USB address is the one
- * advertised whenever it is there, and the hotspot is the fallback.
+ * Two links survive leaving the mooring, and either one does the whole job — position and
+ * AIS travel on the same stream, so neither depends on which link carries it. When both are
+ * up only one address can be advertised, so the cable wins the tie; but every reachable
+ * address is reported, because the tablet is on one of them and guessing wrong is silent.
  *
  * Android exposes no public API for either state, so this is interface-based: USB tethering
  * appears as a virtual ethernet (rndis/ncm), and the AP as a tethering interface on which the
@@ -73,6 +77,17 @@ object NetworkUtils {
         cableAddress(interfaces)
             ?: hotspotAddress(interfaces)
             ?: interfaces.firstOrNull { !isMobileName(it.name) }?.ipv4
+
+    /**
+     * Every address the tablet could be reached on, best first. More than one means the
+     * choice matters: pairing against the wrong one looks exactly like a broken bridge.
+     */
+    fun addresses(interfaces: List<LocalInterface>): List<LinkAddress> = buildList {
+        cableAddress(interfaces)?.let { add(LinkAddress(Link.CABLE, it)) }
+        hotspotAddress(interfaces)?.let { add(LinkAddress(Link.HOTSPOT, it)) }
+        val other = interfaces.firstOrNull { !isMobileName(it.name) && !isCableName(it.name) && !isHotspotName(it.name) }
+        if (isEmpty() && other != null) add(LinkAddress(Link.OTHER, other.ipv4))
+    }
 
     /** Which kind of link the advertised address belongs to, or null when there is no network. */
     fun linkOf(interfaces: List<LocalInterface>): Link? = when {

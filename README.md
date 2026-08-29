@@ -13,8 +13,24 @@ la reconoce como una fuente de posición externa (igual que un gateway NMEA de b
 
 En el teléfono, la primera vez hay que permitir "instalar apps de orígenes desconocidos".
 
-La app misma te dice qué build tenés instalado (versión + commit) y te lleva a esa página
-de Releases: **menú lateral → Versión y descarga**.
+La app misma te dice qué build tenés instalado (versión + número de build + commit) y te
+lleva a esa página de Releases: **menú lateral → Versión y descarga**. El número de build
+sube en cada APK publicado: si el de Releases es mayor que el tuyo, estás atrasado.
+
+### Actualizar encima de la versión instalada
+
+Se instala encima, sin desinstalar. **Con una excepción: la primera vez que actualices desde
+un APK anterior al build 49 hay que desinstalar** — y ahí sí perdés la configuración
+guardada (puerto, switches). De ahí en adelante, nunca más.
+
+El motivo: hasta ese build cada APK se firmaba con una clave distinta. Gradle firma los
+builds de debug con un keystore que genera solo si no existe, y CI corre en una máquina
+nueva cada vez, así que generaba uno nuevo en cada corrida. Android **se niega a actualizar
+una app cuya firma cambió** y el instalador te lo muestra como un escueto "aplicación no
+instalada", sin decir por qué. Ahora el repo tiene un keystore fijo
+(`app/oshun-debug.keystore`), commiteado a propósito y con la contraseña a la vista: es la
+clave de una app de debug que se instala a mano, no protege nada, y lo que compra es que una
+actualización entre encima de la anterior y te respete la configuración.
 
 ## Cómo funciona
 
@@ -27,7 +43,7 @@ Teléfono (esta app)                         Tablet (Navionics)
 ```
 
 La tablet se conecta por **cable USB** o al **hotspot del teléfono**. La app **no arranca** sobre una Wi‑Fi
-ajena, y eso es a propósito: ver [Requisito de red](#requisito-de-red-cable-primero-hotspot-si-no-hay-cable).
+ajena, y eso es a propósito: ver [Requisito de red](#requisito-de-red-un-enlace-que-zarpe-con-vos-hotspot-o-cable).
 
 ## Las pantallas (menú lateral)
 
@@ -38,6 +54,7 @@ mes. Ahora hay un **menú lateral** (el ☰ arriba a la izquierda, o deslizando 
 | Pantalla | Qué hay |
 |---|---|
 | **Puente** | Requisitos de red, puerto, TCP/UDP, intervalo, apagado automático, **Iniciar/Detener** y la tarjeta de estado. Lo que se opera en el agua. |
+| **AIS por internet** | El switch del feed de aisstream.io, su API key y la advertencia de qué **no** muestra. |
 | **Datos de prueba** | El switch del barco simulado y los barcos AIS de prueba, con la explicación completa. |
 | **Versión y descarga** | Qué build tenés instalado y el acceso a GitHub Releases. |
 | **Registro** | La bitácora de eventos y el CSV para compartir (sigue siendo su propia pantalla). |
@@ -46,31 +63,38 @@ Con el modo prueba encendido, la pantalla **Puente** lo avisa arriba del botón 
 ofrece el atajo para volver a apagarlo: que la posición que sale no sea la tuya no puede
 depender de acordarte de entrar a otra pantalla.
 
-## Requisito de red: cable primero, hotspot si no hay cable
+## Requisito de red: un enlace que zarpe con vos (hotspot o cable)
 
-El puente **solo transmite sobre un enlace que zarpa con vos**. Hay dos, y la app prefiere
-el primero:
 
-1. **Cable USB entre el teléfono y la tablet** (anclaje por USB). Alcanza por sí solo, con
-   la Wi‑Fi prendida o apagada.
-2. **Hotspot del teléfono**, y para eso hacen falta las dos condiciones:
+El puente **solo transmite sobre un enlace que zarpa con vos**, y hay dos. **Cualquiera de
+los dos sirve igual**: por el enlace que elijas va todo — la posición y los targets AIS
+viajan por la misma conexión, así que nada anda por uno y no por el otro.
+
+1. **Hotspot del teléfono**, y para eso hacen falta las dos condiciones:
    - ✓ **Hotspot del teléfono encendido**
    - ✓ **Wi‑Fi del teléfono apagado**
+2. **Cable USB entre el teléfono y la tablet** (anclaje por USB). Alcanza por sí solo, con
+   la Wi‑Fi prendida o apagada.
 
 Mientras no se cumpla ninguna de las dos opciones, el botón Iniciar queda deshabilitado.
 
 El motivo es una falla real: en la amarra, el Wi‑Fi del club llega a los dos aparatos, el
 emparejamiento funciona y todo parece andar — hasta que zarpás y a los pocos metros el
 teléfono se va de esa red. La IP que la app había mostrado deja de significar nada, la
-tablet pierde al teléfono y la carta se congela sin que ninguno de los dos avise. El
-hotspot es el único enlace que zarpa con vos.
+tablet pierde al teléfono y la carta se congela sin que ninguno de los dos avise. El hotspot
+y el cable son los únicos enlaces que zarpan con vos.
 
-Además, la IP que muestra la app es **la del enlace elegido** — el cable si hay cable, si no
-el hotspot — y no la de cualquier interfaz que aparezca primero: antes podía mostrarte la de
-la Wi‑Fi (o incluso una de la red celular) mientras la tablet estaba del otro lado. La
-tarjeta de estado dice cuál está usando (`Enlace: cable USB` / `hotspot del teléfono`).
+Además, la IP que muestra la app es **la de un enlace que zarpa con vos**, no la de
+cualquier interfaz que aparezca primero: antes podía mostrarte la de la Wi‑Fi (o incluso una
+de la red celular) mientras la tablet estaba del otro lado. La tarjeta de estado dice cuál
+está usando (`Enlace: hotspot del teléfono` / `cable USB`).
 
-### Por qué el cable es mejor, cuando anda
+**Si los dos enlaces están arriba** —por ejemplo el anclaje por USB prendido mientras la
+tablet está en el hotspot— sólo se puede anunciar una dirección, así que se anuncia la del
+cable. Pero la tarjeta de estado lista **las otras direcciones**, porque emparejar contra la
+que no es se ve exactamente igual que un puente roto.
+
+### Qué aporta el cable, cuando anda
 
 Navionics lee NMEA por TCP/UDP, o sea que necesita una **red IP**: no existe entrada serie
 por USB. El anclaje por USB es justamente eso — el cable se presenta como una placa de red
@@ -78,6 +102,9 @@ virtual (`rndis0`/`ncm0`, típicamente `192.168.42.129` del lado del teléfono) 
 el puente es una red más, y la mejor de todas: no tiene alcance que perder, no se le mete
 nadie, no hay que emparejar nada y el teléfono se va cargando en vez de gastarse la batería
 en dos radios.
+
+**No hace falta**: el hotspot hace exactamente el mismo trabajo, y es el camino probado. El
+cable es una opción más, para cuando la preferís.
 
 **La salvedad honesta:** que funcione depende de la tablet, no de la app. La tablet tiene que
 poder actuar de *host* USB y levantar la interfaz del teléfono; algunas lo hacen y otras
@@ -172,6 +199,58 @@ que lo único que impide confundirlos es que se llaman `TEST` y que sus MMSI est
 bloque que ninguna administración asigna. Fuera del modo prueba **no se transmite ningún
 target**, y eso tiene su propio test.
 
+## Barcos AIS de internet
+
+Además de tu posición, el puente puede mostrar en la carta **los barcos que un servicio de
+internet reporta cerca tuyo**. Está apagado por defecto y hay que darle una API key.
+
+1. Sacá una key gratis en [aisstream.io](https://aisstream.io).
+2. En la app, **menú lateral → AIS por internet**: pegá la key y prendé el switch.
+3. En Navionics: **Menu → Map Options → AIS Settings → Display AIS Targets**.
+
+Los targets van por **la misma conexión que tu posición**, así que funciona igual por hotspot
+o por cable. La key queda guardada sólo en el teléfono, en su propio almacenamiento: nunca
+entra en la configuración que viaja por intents, ni en el CSV, ni en el registro.
+
+### Lo que hace para no mentirte
+
+Un target viejo dibujado como si fuera actual es peor que no tener nada: pone un barco donde
+no hay ninguno, y el triángulo no dice nada de su edad. Entonces:
+
+- Un reporte tiene **vencimiento (6 minutos)**. Pasado eso se descarta, no se vuelve a dibujar.
+- Sólo salen los que están **a menos de 12 M**, los más cercanos primero, hasta 40.
+- **Si el feed se corta**, la app lo anota en el registro y deja de mandar targets, en vez de
+  dejarte fantasmas en la carta.
+
+### Cómo saber por qué no aparecen barcos
+
+La tarjeta de estado separa tres cosas que se ven igual desde la carta:
+
+| Lo que ves | Qué significa |
+|---|---|
+| No aparece la fila **Feed AIS** | El feed no está prendido, o falta la API key |
+| `Feed AIS: caído` | Problema de conexión o de key |
+| `conectado · 0 mensajes` | Conecta, pero no llega nada: **no hay cobertura en la zona** |
+| `conectado · N mensajes` con `Targets AIS: 0` | Llegan datos y no los sabemos leer, o están todos lejos/viejos |
+
+En el último caso el registro guarda **el primer mensaje del feed tal como llegó**, recortado.
+Ése es el dato que permite corregir el parser contra la realidad.
+- Las señales de "no disponible" del estándar (102,3 nudos, rumbo 360, heading 511) y la
+  posición 0,0 se descartan en vez de dibujarse.
+
+### De dónde salen los datos
+
+Hoy, de [aisstream.io](https://aisstream.io). La comparación con las alternativas —incluidas
+las pagas y la opción de un receptor AIS físico— está en
+[`docs/ais-fuentes.md`](docs/ais-fuentes.md).
+
+### Lo que no es
+
+**No sirve para evitar colisiones.** Los datos llegan con demora, dependen de que haya señal,
+y sólo incluyen barcos que **transmiten AIS**: lanchas, pescadores y casi todo lo chico no
+está. Una carta que se ve vacía porque el feed es pobre es lo más peligroso que esta función
+puede producir, y por eso el aviso está en la app y no sólo acá.
+
 ## Si Navionics se queda con una posición vieja
 
 Lo más engañoso de este puente es que puede *parecer* que anda mientras la tablet
@@ -260,6 +339,11 @@ app/
     core/DeliveryTracker.kt    convierte el flujo de envíos en los pocos eventos que importan
     core/EventLog.kt           historial acotado de eventos, observable por la pantalla de registro
     core/TrackLogFormatter.kt  arma el CSV de la bitácora (puro, testeado línea por línea)
+    core/AisTraffic.kt         los targets AIS vigentes: qué entra, qué caduca (puro)
+    net/AisStreamMessages.kt   parseo de los mensajes de aisstream.io (puro)
+    net/AisSubscription.kt     qué se le pide al feed y cada cuánto (puro)
+    ais/AisStreamFeed.kt       el WebSocket al feed de internet [Android]
+    store/AisKeyStore.kt       la API key del feed, aparte de la config a propósito [Android]
     store/ConfigStore.kt       persistencia (SharedPreferences) de config y último motivo de apagado [Android]
     store/TrackLogWriter.kt    CSV rotativo en disco + copia compartible [Android]
     LogActivity.kt             pantalla de registro (Jetpack Compose) [Android]
@@ -270,6 +354,7 @@ app/
     MainActivity.kt            actividad única: monta el shell y nada más [Android]
     ui/OshunShell.kt           menú lateral + barra superior; decide qué pantalla se ve [Android]
     ui/BridgeScreen.kt         pantalla Puente: red, transportes, Iniciar/Detener, estado [Android]
+    ui/AisFeedScreen.kt        pantalla AIS por internet: switch, API key y advertencia [Android]
     ui/TestDataScreen.kt       pantalla Datos de prueba: barco simulado y targets AIS [Android]
     ui/VersionScreen.kt        pantalla Versión y descarga: build instalado + Releases [Android]
     ui/BridgeSettings.kt       la config que el usuario edita, izada arriba de las pantallas
@@ -357,7 +442,8 @@ de batería, opcional: solo se usa cuando tocás el botón del banner).
 - [x] Sockets no bloqueantes: se distingue "no había nadie" de "mandé y no lo consumieron"
 - [x] Modo prueba: barco simulado a 4 nudos entre dos waypoints a 12 M, para probar Navionics en seco
 - [x] Requisito de enlace: no se puede transmitir sobre una Wi‑Fi ajena, y la IP mostrada es la del enlace elegido
-- [x] Cable USB (anclaje por USB) como enlace preferido, con el hotspot de alternativa
+- [x] Cable USB (anclaje por USB) como enlace alternativo al hotspot; los dos hacen lo mismo
+- [x] Barcos AIS: dos simulados en modo prueba, y un feed real de internet con vencimiento y aviso
 - [x] La app muestra su build (versión + commit) y enlaza a la última versión publicada
 - [x] Código en inglés; todos los textos de UI en `res/values/strings.xml`
 - [x] CI que compila el APK y lo publica como artifact

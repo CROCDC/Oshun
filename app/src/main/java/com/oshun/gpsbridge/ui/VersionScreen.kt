@@ -40,7 +40,12 @@ fun VersionScreen(modifier: Modifier = Modifier) {
     ) {
         SectionCard(stringResource(R.string.version_title)) {
             Text(
-                stringResource(R.string.version_value, BuildConfig.VERSION_NAME, BuildConfig.GIT_SHA),
+                stringResource(
+                    R.string.version_value,
+                    BuildConfig.VERSION_NAME,
+                    BuildConfig.VERSION_CODE,
+                    BuildConfig.GIT_SHA,
+                ),
                 style = MaterialTheme.typography.headlineSmall,
                 fontFamily = FontFamily.Monospace,
             )

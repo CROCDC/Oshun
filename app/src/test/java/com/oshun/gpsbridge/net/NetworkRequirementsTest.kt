@@ -85,4 +85,40 @@ class NetworkRequirementsTest {
         assertTrue(state.anyLocalNetwork)
         assertTrue(state.address == "192.168.43.1")
     }
+
+    @Test
+    fun eitherLinkOnItsOwnIsACompleteAnswer() {
+        // Neither is a fallback: the position and the AIS traffic ride the same stream, so
+        // whatever works on one link works on the other.
+        val overCable = NetworkRequirements(hotspotUp = false, wifiOff = false, cableUp = true)
+        val overHotspot = NetworkRequirements(hotspotUp = true, wifiOff = true)
+        assertTrue(overCable.metFor(simulated = false))
+        assertTrue(overHotspot.metFor(simulated = false))
+    }
+
+    @Test
+    fun namesTheAddressesThatAreNotBeingAdvertised() {
+        val both = NetworkRequirements(
+            hotspotUp = true,
+            wifiOff = true,
+            cableUp = true,
+            address = "192.168.42.129",
+            addresses = listOf(
+                LinkAddress(Link.CABLE, "192.168.42.129"),
+                LinkAddress(Link.HOTSPOT, "192.168.43.1"),
+            ),
+        )
+        assertEquals(listOf(LinkAddress(Link.HOTSPOT, "192.168.43.1")), both.otherAddresses())
+    }
+
+    @Test
+    fun withOneAddressThereIsNothingElseToSuggest() {
+        val single = NetworkRequirements(
+            hotspotUp = true,
+            wifiOff = true,
+            address = "192.168.43.1",
+            addresses = listOf(LinkAddress(Link.HOTSPOT, "192.168.43.1")),
+        )
+        assertTrue(single.otherAddresses().isEmpty())
+    }
 }

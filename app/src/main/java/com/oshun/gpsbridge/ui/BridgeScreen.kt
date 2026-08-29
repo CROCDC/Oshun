@@ -205,7 +205,7 @@ fun BridgeScreen(
             BatteryOptimizationBanner(onFix = { openBatteryOptimizationSettings(context) })
         }
 
-        if (status.running) StatusCard(status, network.link, nowMillis)
+        if (status.running) StatusCard(status, network, nowMillis)
 
         InstructionsCard()
     }
@@ -266,22 +266,8 @@ private fun NetworkRequirementsCard(
                 onFix = onOpenHotspot,
             )
         } else {
-            // The cable is enough on its own; the hotspot rows below are the alternative.
-            RequirementRow(
-                met = network.cableUp,
-                label = stringResource(R.string.net_req_cable),
-                actionLabel = stringResource(R.string.net_open_usb),
-                tag = "fix_usb",
-                onFix = onOpenHotspot, // the tethering screen is where USB tethering lives
-            )
-            Text(
-                stringResource(R.string.net_req_cable_hint),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                stringResource(R.string.net_req_or),
-                style = MaterialTheme.typography.bodySmall,
-            )
+            // Either link is a complete answer, so these are two ways of getting there
+            // rather than a preference: the hotspot first because it needs no hardware.
             RequirementRow(
                 met = network.hotspotUp,
                 label = stringResource(R.string.net_req_hotspot),
@@ -295,6 +281,21 @@ private fun NetworkRequirementsCard(
                 actionLabel = stringResource(R.string.net_open_wifi),
                 tag = "fix_wifi",
                 onFix = onOpenWifi,
+            )
+            Text(
+                stringResource(R.string.net_req_or),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            RequirementRow(
+                met = network.cableUp,
+                label = stringResource(R.string.net_req_cable),
+                actionLabel = stringResource(R.string.net_open_usb),
+                tag = "fix_usb",
+                onFix = onOpenHotspot, // the tethering screen is where USB tethering lives
+            )
+            Text(
+                stringResource(R.string.net_req_cable_hint),
+                style = MaterialTheme.typography.bodySmall,
             )
         }
     }
@@ -381,7 +382,7 @@ private fun CrashBanner(onView: () -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun StatusCard(status: BridgeStatus, link: Link?, nowMillis: Long) {
+private fun StatusCard(status: BridgeStatus, network: NetworkRequirements, nowMillis: Long) {
     SectionCard(stringResource(R.string.status_title)) {
         if (status.simulated) {
             Text(
@@ -391,9 +392,37 @@ private fun StatusCard(status: BridgeStatus, link: Link?, nowMillis: Long) {
             )
         }
         KeyValue(stringResource(R.string.status_ip), status.ipAddress ?: stringResource(R.string.status_no_wifi))
-        link?.let { KeyValue(stringResource(R.string.status_link), linkText(it)) }
+        network.link?.let { KeyValue(stringResource(R.string.status_link), linkText(it)) }
+        // Both links can be up at once and only one address is advertised. Naming the
+        // others is the difference between "it does not work" and "pair with that one".
+        val others = network.otherAddresses()
+        if (others.isNotEmpty()) {
+            // Resolved in the composable's own scope: joinToString takes a noinline
+            // lambda, and stringResource cannot be called from inside one.
+            val labels = mutableListOf<String>()
+            for (other in others) {
+                labels += stringResource(R.string.status_other_address, linkText(other.link), other.ipv4)
+            }
+            KeyValue(stringResource(R.string.status_other_addresses), labels.joinToString(" · "))
+            Text(
+                stringResource(R.string.status_other_hint),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         if (status.aisTargets > 0) {
             KeyValue(stringResource(R.string.status_ais), status.aisTargets.toString())
+        }
+        // Connection and message count next to the target count: apart, they say whether a
+        // silent chart is a dead feed, empty water, or sentences we are failing to read.
+        if (status.aisFeedConnected || status.aisMessages > 0) {
+            KeyValue(
+                stringResource(R.string.status_ais_feed),
+                if (status.aisFeedConnected) {
+                    stringResource(R.string.status_ais_feed_up, status.aisMessages)
+                } else {
+                    stringResource(R.string.status_ais_feed_down, status.aisMessages)
+                },
+            )
         }
         KeyValue(stringResource(R.string.status_port), status.port.toString())
         val protocols = BridgeLogic.enabledProtocols(status)
