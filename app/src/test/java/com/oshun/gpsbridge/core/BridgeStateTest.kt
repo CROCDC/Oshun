@@ -12,6 +12,8 @@ class BridgeStateTest {
     @After
     fun tearDown() {
         BridgeState.reset()
+        // reset() deliberately keeps the AIS report; nothing may carry it into the next test.
+        BridgeState.update { it.copy(aisSnapshot = null) }
     }
 
     @Test
@@ -29,6 +31,32 @@ class BridgeStateTest {
         assertFalse(c.simulated)
         assertEquals(1000L, c.intervalMillis)
         assertEquals(9000, c.copy(port = 9000).port)
+    }
+
+    @Test
+    fun stoppingKeepsTheAisReportForWhoeverGoesLookingForIt() {
+        // The report is evidence about the session that just ended and it is read after the
+        // stop — that is the entire point of it. Clearing it here left the log screen with
+        // nothing to hand over exactly when somebody had gone there to hand it over.
+        val snapshot = AisReport.Snapshot(
+            atMillis = 1_787_229_296_000L,
+            own = null,
+            fixValid = false,
+            known = emptyList(),
+            transmitted = emptySet(),
+            feedConnected = false,
+            feedMessages = 12,
+            simulated = false,
+            link = "TCP:2000 · 1 cliente",
+            sentences = emptyList(),
+        )
+        BridgeState.update { it.copy(running = true, sentencesSent = 42, aisSnapshot = snapshot) }
+
+        BridgeState.reset()
+
+        assertFalse("everything else goes", BridgeState.status.value.running)
+        assertEquals(0L, BridgeState.status.value.sentencesSent)
+        assertEquals("the report stays", snapshot, BridgeState.status.value.aisSnapshot)
     }
 
     @Test

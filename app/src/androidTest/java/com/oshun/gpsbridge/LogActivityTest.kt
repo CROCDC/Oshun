@@ -61,6 +61,7 @@ class LogActivityTest {
     @After
     fun forgetTheSnapshot() {
         BridgeState.reset()
+        BridgeState.update { it.copy(aisSnapshot = null) }
     }
 
     private fun str(resId: Int) = compose.activity.getString(resId)
@@ -107,6 +108,9 @@ class LogActivityTest {
         // app is involved at all. So what is covered here is the wiring, which is where a bug
         // would actually live — the button finds the snapshot the service published, and
         // neither path takes the screen down. What the text says is AisReportTest's business.
+        // reset() keeps the report on purpose, so the empty case has to be asked for.
+        BridgeState.update { it.copy(aisSnapshot = null) }
+        compose.waitForIdle()
         compose.onNodeWithTag("log_copy_ais").performClick()
         compose.waitForIdle()
         compose.onNodeWithText(str(R.string.log_title)).assertExists()

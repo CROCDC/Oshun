@@ -11,12 +11,18 @@ import com.oshun.gpsbridge.core.StopReason
 import com.oshun.gpsbridge.location.FixProvider
 import com.oshun.gpsbridge.location.LocationSource
 import com.oshun.gpsbridge.model.Fix
+import com.oshun.gpsbridge.net.AisSubscription
+import com.oshun.gpsbridge.store.AisKeyStore
 import com.oshun.gpsbridge.store.ConfigStore
 import com.oshun.gpsbridge.store.TrackLogWriter
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -46,8 +52,13 @@ class GpsBridgeServiceTest {
     private val controllers = mutableListOf<ServiceController<GpsBridgeService>>()
     private val defaultAutoOffMillis = GpsBridgeService.autoOffMillis
 
+    /** The fake aisstream, for the tests that need the real feed path without the network. */
+    private var aisServer: MockWebServer? = null
+    private var feedSocket: WebSocket? = null
+
     @Before
     fun setUp() {
+        feedSocket = null
         BridgeState.reset()
         EventLog.clear()
         TrackLogWriter.clear(RuntimeEnvironment.getApplication())
@@ -69,6 +80,11 @@ class GpsBridgeServiceTest {
         TrackLogWriter.clear(RuntimeEnvironment.getApplication())
         EventLog.clear()
         BridgeState.reset()
+        AisSubscription.url = AisSubscription.DEFAULT_URL
+        aisServer?.let { runCatching { it.shutdown() } }
+        aisServer = null
+        feedSocket = null
+        AisKeyStore.save(RuntimeEnvironment.getApplication(), "")
     }
 
     private fun freePort(): Int = ServerSocket(0).use { it.localPort }
@@ -107,6 +123,7 @@ class GpsBridgeServiceTest {
         autoOff: Boolean = true,
         rawLog: Boolean = true,
         simulated: Boolean = false,
+        ais: Boolean = false,
     ): Intent = Intent(RuntimeEnvironment.getApplication(), GpsBridgeService::class.java).apply {
         putExtra(GpsBridgeService.EXTRA_PORT, port)
         putExtra(GpsBridgeService.EXTRA_TCP, tcp)
@@ -115,6 +132,7 @@ class GpsBridgeServiceTest {
         putExtra(GpsBridgeService.EXTRA_AUTO_OFF, autoOff)
         putExtra(GpsBridgeService.EXTRA_RAW_LOG, rawLog)
         putExtra(GpsBridgeService.EXTRA_SIMULATED, simulated)
+        putExtra(GpsBridgeService.EXTRA_AIS, ais)
     }
 
     private fun startService(
@@ -124,7 +142,35 @@ class GpsBridgeServiceTest {
         autoOff: Boolean = true,
         rawLog: Boolean = true,
         simulated: Boolean = false,
-    ): GpsBridgeService = startWith(startIntent(port, tcp, udp, autoOff, rawLog, simulated))
+        ais: Boolean = false,
+    ): GpsBridgeService = startWith(startIntent(port, tcp, udp, autoOff, rawLog, simulated, ais))
+
+    /** In the river, so the fake feed's vessel is inside the range we actually transmit. */
+    private val riverFix = Fix(
+        latitude = -34.95,
+        longitude = -57.55,
+        speedMetersPerSecond = 3.0,
+        bearingDegrees = 45.0,
+        altitudeMeters = 2.0,
+        satellites = 9,
+        timeUtcMillis = 0L,
+    )
+
+    private fun awaitFeedSocket() {
+        repeat(200) {
+            if (feedSocket != null) return
+            Thread.sleep(20)
+        }
+        assertTrue("the feed never opened its socket", feedSocket != null)
+    }
+
+    private fun awaitAisTargets(expected: Int) {
+        repeat(200) {
+            if (BridgeState.status.value.aisTargets == expected) return
+            Thread.sleep(20)
+        }
+        assertEquals(expected, BridgeState.status.value.aisTargets)
+    }
 
     private fun trackFile(): File = File(File(RuntimeEnvironment.getApplication().filesDir, "logs"), "track.csv")
 
@@ -523,6 +569,77 @@ class GpsBridgeServiceTest {
     }
 
     @Test
+    fun aConnectingClientDoesNotSilenceTheAisFeed() {
+        // The bug this guards: tearing the feed down lived in cancelIdleOff(), which runs when
+        // a client CONNECTS. So the moment Navionics attached, the feed was closed and the
+        // traffic wiped, and every batch after that carried our own position and not one
+        // vessel — for the rest of the session. The plotter was right to say it had no AIS.
+        val port = freePort()
+        GpsBridgeService.fixProviderFactory = { fakeProvider(riverFix) }
+        AisKeyStore.save(RuntimeEnvironment.getApplication(), "clave-de-prueba")
+        aisServer = MockWebServer().apply { start() }
+        AisSubscription.url = aisServer!!.url("/stream").toString().replace("http://", "ws://")
+        aisServer!!.enqueue(
+            MockResponse().withWebSocketUpgrade(
+                object : WebSocketListener() {
+                    override fun onOpen(webSocket: WebSocket, response: okhttp3.Response) {
+                        feedSocket = webSocket
+                    }
+                },
+            ),
+        )
+
+        // autoOff on and TCP only: exactly the configuration that armed the watchdog, which
+        // is what made a connecting client run the teardown.
+        val service = startService(port, tcp = true, udp = false, autoOff = true, ais = true)
+        awaitRunning(true)
+
+        // The feed opens on the first fix, so wait for the socket before feeding it a vessel.
+        awaitFeedSocket()
+        feedSocket!!.send(RIVER_VESSEL)
+        awaitAisTargets(1)
+
+        // Only now the plotter shows up — the moment that used to kill it.
+        val client = connect(port)
+        awaitTcpClients(1)
+
+        val reader = BufferedReader(client.getInputStream().reader(Charsets.US_ASCII))
+        var vessels = 0
+        repeat(MAX_LINES_READ) {
+            val line = reader.readLine() ?: return@repeat
+            if (line.startsWith("!AIVDM")) vessels++
+        }
+        assertTrue("the client connected and the traffic stopped", vessels > 0)
+        assertEquals("and the count must still be telling the truth", 1, BridgeState.status.value.aisTargets)
+
+        client.close()
+        stop(service)
+        awaitRunning(false)
+    }
+
+    @Test
+    fun aDeadFeedStopsClaimingItHasVessels() {
+        // The count froze at its last value when the feed went away, so a status card reading
+        // "12 targets" sat over a stream carrying none. A number that cannot go back down is
+        // worse than no number: it is the one thing that looked healthy while nothing was.
+        val port = freePort()
+        GpsBridgeService.fixProviderFactory = { fakeProvider(riverFix) }
+        // No key, so the feed never opens: that is the state whose batches used to return
+        // early and leave the count exactly as they found it.
+        AisKeyStore.save(RuntimeEnvironment.getApplication(), "")
+        val service = startService(port, tcp = true, udp = false, ais = true)
+        awaitRunning(true)
+
+        // A count a live feed had published, moments before it went away. The next batch has
+        // to correct it; the old code walked past it for the rest of the session.
+        BridgeState.update { it.copy(aisTargets = 12) }
+        awaitAisTargets(0)
+
+        stop(service)
+        awaitRunning(false)
+    }
+
+    @Test
     fun aRealNavigationCarriesNoSimulatedTraffic() {
         // Inventing vessels on a live chart is the one failure this feature could cause, so
         // the guard gets its own test rather than being a line nobody exercises.
@@ -584,6 +701,14 @@ class GpsBridgeServiceTest {
 
     /** Enough sentences to cover several emissions without hanging if the stream goes quiet. */
     private val MAX_LINES_READ = 40
+
+    /** One vessel, a mile or so from [riverFix], in the shape aisstream actually sends. */
+    private val RIVER_VESSEL = """
+        {"MessageType":"PositionReport",
+         "MetaData":{"MMSI":701000123,"ShipName":"RIO PARANA"},
+         "Message":{"PositionReport":{"UserID":701000123,"Latitude":-34.96,"Longitude":-57.56,
+                    "Sog":11.0,"Cog":120.0,"TrueHeading":121,"NavigationalStatus":0}}}
+    """.trimIndent()
 
     private fun connect(port: Int): Socket {
         var last: Exception? = null

@@ -295,7 +295,15 @@ class GpsBridgeService : Service() {
      * the names run slower, because a name is not news twice.
      */
     private fun aisSentences(current: BridgeConfig, now: Long): List<String> {
-        if (!current.simulated && aisFeed == null) return emptyList()
+        if (!current.simulated && aisFeed == null) {
+            // Say zero rather than saying nothing. Returning early without touching the count
+            // left it frozen at whatever the feed managed before it died, so the status card
+            // went on claiming twelve vessels while every batch carried none — the one number
+            // that could have told us the feed was gone was the one still saying it was fine.
+            lastVisibleTargets = emptyList()
+            BridgeState.update { it.copy(aisTargets = 0) }
+            return emptyList()
+        }
         val withNames =
             BridgeLogic.shouldEmitAgain(now, lastAisNamesAtMillis, BridgeLogic.AIS_STATIC_INTERVAL_MILLIS)
         if (withNames) lastAisNamesAtMillis = now
@@ -526,13 +534,20 @@ class GpsBridgeService : Service() {
         }
     }
 
+    /**
+     * Disarms the watchdog, and nothing else.
+     *
+     * This used to tear the AIS feed down here as well, which put the teardown on the one
+     * path that means the opposite of shutting down: a client connected. So the moment
+     * Navionics attached, the feed was closed, the traffic was wiped, and every batch from
+     * then on carried our own position and not one vessel — for the rest of the session,
+     * because nothing recreates the feed outside a session start. The plotter was right when
+     * it said it was receiving no AIS.
+     */
     @Synchronized
     private fun cancelIdleOff() {
         autoOffJob?.cancel()
         autoOffJob = null
-        aisFeed?.stop()
-        aisFeed = null
-        aisTargets = emptyMap()
     }
 
     /** Samples battery level and instantaneous draw, publishing an estimated drain rate. */
@@ -592,6 +607,11 @@ class GpsBridgeService : Service() {
             }
         }
         transports.clear()
+        // The feed is the session's, and aisstream allows one connection per key: leaving it
+        // open strands that connection, and the next session's feed is refused outright.
+        aisFeed?.stop()
+        aisFeed = null
+        aisTargets = emptyMap()
         sent = 0
         heartbeats = 0
         lastFix = null
