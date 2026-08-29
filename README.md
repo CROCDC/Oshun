@@ -8,13 +8,13 @@ la reconoce como una fuente de posición externa (igual que un gateway NMEA de b
 
 ## Descargar la app
 
-- **Último APK (recomendado):** [Releases → `debug-latest`](https://github.com/CROCDC/Oshun/releases/tag/debug-latest) → descargá `app-debug.apk`. Es público, sin login y sin descomprimir; se actualiza en cada build verde (que pasó unit + instrumentados).
+- **Último APK (recomendado):** desde la app, **menú lateral → Versión y descarga → Descargar el último APK**: baja el archivo directo, sin pasar por ninguna página. También está el link a mano: [Releases → `debug-latest`](https://github.com/CROCDC/Oshun/releases/tag/debug-latest), donde el APK se llama `oshun-<build>.apk`. Es público, sin login y sin descomprimir; se actualiza en cada build verde (que pasó unit + instrumentados).
 - **Todas las versiones:** [página de Releases](https://github.com/CROCDC/Oshun/releases).
 
 En el teléfono, la primera vez hay que permitir "instalar apps de orígenes desconocidos".
 
 La app misma te dice qué build tenés instalado (versión + número de build + commit) y te
-lleva a esa página de Releases: **menú lateral → Versión y descarga**. El número de build
+baja el APK nuevo de una: **menú lateral → Versión y descarga**. El número de build
 sube en cada APK publicado: si el de Releases es mayor que el tuyo, estás atrasado.
 
 ### Actualizar encima de la versión instalada
@@ -372,7 +372,7 @@ por tests.
 ## Descargar el APK ya compilado
 
 No hace falta compilar nada localmente: cada push corre el workflow
-**Build APK** (GitHub Actions) y publica el `app-debug.apk` como *artifact*.
+**Build APK** (GitHub Actions) y publica el `oshun-<build>.apk` como *artifact*.
 En GitHub → pestaña **Actions** → última corrida del branch → sección
 **Artifacts** → `oshun-gps-bridge-debug`. Lo descomprimís y lo instalás en el
 teléfono (hay que permitir "instalar apps de orígenes desconocidos").

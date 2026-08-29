@@ -26,6 +26,9 @@ android {
         val gitSha = (project.findProperty("gitSha") as String?)?.take(7) ?: "local"
         buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
         buildConfigField("String", "RELEASES_URL", "\"https://github.com/CROCDC/Oshun/releases/tag/debug-latest\"")
+        // Where the download button asks which file to fetch. The APK is named after its
+        // build, so its address is a question the app can only answer at runtime.
+        buildConfigField("String", "RELEASE_API_URL", "\"https://api.github.com/repos/CROCDC/Oshun/releases/tags/debug-latest\"")
     }
 
     /**
@@ -87,7 +90,7 @@ android {
 }
 
 /**
- * The AIS feed's parsing tests do not run here, and that is deliberate.
+ * The pure parsing tests do not run here, and that is deliberate.
  *
  * They exercise org.json, which lives in the Android framework — and a unit test in this
  * module compiles against the stubbed android.jar, where `isReturnDefaultValues` makes every
@@ -99,6 +102,7 @@ android {
 tasks.withType<Test>().configureEach {
     exclude("**/AisStreamMessagesTest*")
     exclude("**/AisSubscriptionTest*")
+    exclude("**/ReleaseAssetsTest*")
 
     // The live feed test talks to the real aisstream.io with a real key, so it is opt-in and
     // never part of a normal run: no test may depend on the network, and CI has no key. Its

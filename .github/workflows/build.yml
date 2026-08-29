@@ -155,11 +155,16 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug -PgitSha=${{ github.sha }} -PversionCode=${{ github.run_number }}
 
+      # The name carries the build, so a phone that has downloaded before gets a new file
+      # instead of "app-debug (3).apk", and the file itself says which build it is.
+      - name: Name the APK after its build
+        run: mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/oshun-${{ github.run_number }}.apk
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: oshun-gps-bridge-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/oshun-${{ github.run_number }}.apk
           if-no-files-found: error
 
       # Only develop moves the "latest" download. Every branch still gets its APK as a
@@ -178,4 +183,17 @@ jobs:
             versionCode: ${{ github.run_number }}
 
             Se instala encima de la versión anterior sin desinstalar.
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: app/build/outputs/apk/debug/oshun-${{ github.run_number }}.apk
+
+      # A name per build means a new asset every time, so the older ones have to go or the
+      # release piles up an APK per green build for ever. After the upload and never before:
+      # a failed publish must not leave the download button pointing at nothing.
+      - name: Drop the older APKs from the release
+        if: github.ref == 'refs/heads/develop'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          keep="oshun-${{ github.run_number }}.apk"
+          for asset in $(gh release view debug-latest --json assets -q '.assets[].name'); do
+            [ "$asset" = "$keep" ] || gh release delete-asset debug-latest "$asset" --yes
+          done
