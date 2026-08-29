@@ -18,6 +18,7 @@ import androidx.core.app.NotificationCompat
 import com.oshun.gpsbridge.MainActivity
 import com.oshun.gpsbridge.R
 import com.oshun.gpsbridge.ais.AisStreamFeed
+import com.oshun.gpsbridge.core.AisReport
 import com.oshun.gpsbridge.core.AisSimulator
 import com.oshun.gpsbridge.core.AisTraffic
 import com.oshun.gpsbridge.core.BatteryMath
@@ -98,6 +99,9 @@ class GpsBridgeService : Service() {
 
     /** When the AIS names last went out; the positions go with every fix, the names do not. */
     private var lastAisNamesAtMillis = 0L
+
+    /** Who made it past the filters in the last batch, so the report can say who did not. */
+    private var lastVisibleTargets: List<AisTarget> = emptyList()
 
     /** The live connection to the internet AIS feed, when the user turned it on. */
     private var aisFeed: AisStreamFeed? = null
@@ -201,6 +205,7 @@ class GpsBridgeService : Service() {
         }
         simulationStartedAtMillis = startedAt
         lastAisNamesAtMillis = 0L
+        lastVisibleTargets = emptyList()
         if (newConfig.rawLogEnabled) {
             TrackLogWriter.open(this, TrackLogFormatter.sessionHeader(startedAt, newConfig))
         }
@@ -302,6 +307,7 @@ class GpsBridgeService : Service() {
         } else {
             AisTraffic.visible(aisTargets, lastFix?.let { Position(it.latitude, it.longitude) }, now)
         }
+        lastVisibleTargets = targets
         BridgeState.update { it.copy(aisTargets = targets.size) }
         return BridgeLogic.aisSentencesFor(targets, now, withNames)
     }
@@ -397,9 +403,30 @@ class GpsBridgeService : Service() {
         sent += lines.size
         if (heartbeat) heartbeats += lines.size
         lastSentAtMillis = now
+
+        // Assembled here because this is the only place that holds both halves at once: what
+        // the feed knows, and what of it actually reached the wire.
+        val snapshot = AisReport.Snapshot(
+            atMillis = now,
+            own = Position(fix.latitude, fix.longitude),
+            fixValid = valid,
+            // Test mode has no feed to have received anything from, so what the simulator
+            // invented is the entire picture.
+            known = if (current.simulated) lastVisibleTargets
+            else AisTraffic.fresh(aisTargets, now).values.toList(),
+            transmitted = lastVisibleTargets.mapTo(mutableSetOf()) { target -> target.mmsi },
+            feedConnected = BridgeState.status.value.aisFeedConnected,
+            feedMessages = aisMessages,
+            simulated = current.simulated,
+            link = "${BridgeLogic.transportsToken(results)}:${current.port} · " +
+                BridgeLogic.clientTotal(results).let { n -> if (n == 1) "1 cliente" else "$n clientes" },
+            sentences = lines,
+        )
+
         BridgeState.update {
             it.copy(
                 lastFix = fix,
+                aisSnapshot = snapshot,
                 sentencesSent = sent,
                 heartbeatsSent = heartbeats,
                 lastFixAtMillis = lastFixAtMillis,

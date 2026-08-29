@@ -127,6 +127,9 @@
     <string name="log_file_size">Archivo CSV: %1$s</string>
     <string name="log_share">Compartir CSV</string>
     <string name="log_clear">Borrar</string>
+    <string name="log_copy_ais">Copiar barcos AIS</string>
+    <string name="log_copy_ais_empty">Todavía no salió ninguna tanda: iniciá la transmisión.</string>
+    <string name="log_copy_ais_done">Barcos AIS copiados</string>
     <string name="log_empty">Todavía no hay eventos. Iniciá la transmisión.</string>
     <string name="log_share_empty">Todavía no hay nada para compartir.</string>
     <!-- %1$s: protocolos y puerto, p. ej. "TCP:2000" -->

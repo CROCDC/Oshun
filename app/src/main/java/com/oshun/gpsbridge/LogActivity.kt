@@ -1,5 +1,7 @@
 package com.oshun.gpsbridge
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
@@ -32,6 +34,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.oshun.gpsbridge.core.AisReport
 import com.oshun.gpsbridge.core.BridgeState
 import com.oshun.gpsbridge.core.EventLog
 import com.oshun.gpsbridge.core.LogEvent
@@ -61,6 +64,7 @@ class LogActivity : ComponentActivity() {
 private fun LogScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val events by EventLog.events.collectAsState()
+    val status by BridgeState.status.collectAsState()
     var sizeBytes by remember { mutableStateOf(TrackLogWriter.sizeBytes(context)) }
 
     LaunchedEffect(Unit) {
@@ -88,6 +92,10 @@ private fun LogScreen(modifier: Modifier = Modifier) {
                 onClick = { shareLog(context) },
                 modifier = Modifier.testTag("log_share"),
             ) { Text(stringResource(R.string.log_share)) }
+            OutlinedButton(
+                onClick = { copyAis(context, status.aisSnapshot) },
+                modifier = Modifier.testTag("log_copy_ais"),
+            ) { Text(stringResource(R.string.log_copy_ais)) }
             OutlinedButton(
                 onClick = { clearLog(context) },
                 modifier = Modifier.testTag("log_clear"),
@@ -127,6 +135,25 @@ private fun EventRow(event: LogEvent) {
             Text(eventLabel(event), style = MaterialTheme.typography.bodyMedium)
         }
     }
+}
+
+/**
+ * The traffic behind the last batch, onto the clipboard.
+ *
+ * The counter on the status card says how many vessels went out and nothing else, which is
+ * the wrong end of the question when the plotter draws none of them: what is needed is every
+ * vessel the feed reported, how far each one is, which ones the filters ate, and the exact
+ * sentences that left the phone. That is too much to read on a phone and exactly right to
+ * paste into a message from the boat.
+ */
+private fun copyAis(context: android.content.Context, snapshot: AisReport.Snapshot?) {
+    if (snapshot == null) {
+        Toast.makeText(context, R.string.log_copy_ais_empty, Toast.LENGTH_SHORT).show()
+        return
+    }
+    val clipboard = context.getSystemService(ClipboardManager::class.java)
+    clipboard?.setPrimaryClip(ClipData.newPlainText("Oshun AIS", AisReport.format(snapshot)))
+    Toast.makeText(context, R.string.log_copy_ais_done, Toast.LENGTH_SHORT).show()
 }
 
 private fun shareLog(context: android.content.Context) {
