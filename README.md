@@ -13,9 +13,8 @@ la reconoce como una fuente de posición externa (igual que un gateway NMEA de b
 
 En el teléfono, la primera vez hay que permitir "instalar apps de orígenes desconocidos".
 
-La app misma muestra abajo de todo qué build tenés instalado (versión + commit) y un botón
-**Descargar la última versión** que abre esa página de Releases, así podés comparar sin
-salir a buscar.
+La app misma te dice qué build tenés instalado (versión + commit) y te lleva a esa página
+de Releases: **menú lateral → Versión y descarga**.
 
 ## Cómo funciona
 
@@ -29,6 +28,23 @@ Teléfono (esta app)                         Tablet (Navionics)
 
 La tablet se conecta por **cable USB** o al **hotspot del teléfono**. La app **no arranca** sobre una Wi‑Fi
 ajena, y eso es a propósito: ver [Requisito de red](#requisito-de-red-cable-primero-hotspot-si-no-hay-cable).
+
+## Las pantallas (menú lateral)
+
+Todo vivía en una sola pantalla que se hizo larga: el botón **Iniciar**, que es lo único
+que se toca al zarpar, terminaba compitiendo por lugar con cosas que se miran una vez por
+mes. Ahora hay un **menú lateral** (el ☰ arriba a la izquierda, o deslizando desde el borde):
+
+| Pantalla | Qué hay |
+|---|---|
+| **Puente** | Requisitos de red, puerto, TCP/UDP, intervalo, apagado automático, **Iniciar/Detener** y la tarjeta de estado. Lo que se opera en el agua. |
+| **Datos de prueba** | El switch del barco simulado y los barcos AIS de prueba, con la explicación completa. |
+| **Versión y descarga** | Qué build tenés instalado y el acceso a GitHub Releases. |
+| **Registro** | La bitácora de eventos y el CSV para compartir (sigue siendo su propia pantalla). |
+
+Con el modo prueba encendido, la pantalla **Puente** lo avisa arriba del botón Iniciar y
+ofrece el atajo para volver a apagarlo: que la posición que sale no sea la tuya no puede
+depender de acordarte de entrar a otra pantalla.
 
 ## Requisito de red: cable primero, hotspot si no hay cable
 
@@ -107,9 +123,9 @@ La app puede emitir por los dos a la vez; después probás cuál te funciona mej
 ## Modo prueba: barco simulado en el Río de la Plata
 
 Para probar la integración completa con Navionics **sin salir al agua**. Con el switch
-**Transmitir barco simulado** (en la tarjeta *Modo prueba*, debajo del botón Iniciar), el
-puente deja de leer el GPS del teléfono y transmite un barco que navega entre dos
-waypoints fijos en el medio del estuario:
+**Transmitir barco simulado** (menú lateral → *Datos de prueba*), el puente deja de leer el
+GPS del teléfono y transmite un barco que navega entre dos waypoints fijos en el medio del
+estuario:
 
 | | Latitud | Longitud |
 |---|---|---|
@@ -125,6 +141,8 @@ vas a ver moverse a ~120 m por minuto.
 marcáramos las sentencias como simuladas no estaríamos probando el mismo camino. El aviso
 está donde lo ve la persona, no la tablet:
 
+- La pantalla **Puente** muestra **"Modo prueba activo"** arriba del botón Iniciar, antes
+  de transmitir nada.
 - La tarjeta de estado dice **"MODO PRUEBA: la posición es simulada, no es la tuya"**.
 - La notificación del servicio cambia a **"Oshun — MODO PRUEBA (posición simulada)"**.
 - El registro abre la sesión con un evento de modo prueba, y el CSV la marca con
@@ -245,10 +263,18 @@ app/
     store/ConfigStore.kt       persistencia (SharedPreferences) de config y último motivo de apagado [Android]
     store/TrackLogWriter.kt    CSV rotativo en disco + copia compartible [Android]
     LogActivity.kt             pantalla de registro (Jetpack Compose) [Android]
+    UiText.kt                  tokens del core → texto traducido, compartido por las pantallas
     location/LocationSource.kt FusedLocationProvider → Fix (Flow) [Android]
     location/SimulatedFixProvider.kt  el track simulado como fuente de fixes, para el modo prueba
     service/GpsBridgeService.kt foreground service, pantalla apagada [Android]
-    MainActivity.kt            UI (Jetpack Compose) [Android]
+    MainActivity.kt            actividad única: monta el shell y nada más [Android]
+    ui/OshunShell.kt           menú lateral + barra superior; decide qué pantalla se ve [Android]
+    ui/BridgeScreen.kt         pantalla Puente: red, transportes, Iniciar/Detener, estado [Android]
+    ui/TestDataScreen.kt       pantalla Datos de prueba: barco simulado y targets AIS [Android]
+    ui/VersionScreen.kt        pantalla Versión y descarga: build instalado + Releases [Android]
+    ui/BridgeSettings.kt       la config que el usuario edita, izada arriba de las pantallas
+    ui/Components.kt           tarjeta, fila de switch y fila clave/valor compartidas
+    ui/SystemIntents.kt        las salidas a Ajustes/navegador, cada una con su fallback [Android]
   src/test/java/com/oshun/gpsbridge/
     model/ nmea/ net/ core/    tests unitarios del core (JUnit)
 verify/                        proyecto JVM que corre esos tests + cobertura sin Android SDK

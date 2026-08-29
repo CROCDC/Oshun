@@ -161,17 +161,45 @@ class MainActivityTest {
     }
 
     @Test
+    fun theSideMenuReachesEveryScreen() {
+        // The bridge screen used to carry all of this in one column. The menu is now the
+        // only way to the rest, so it failing silently would strand the user on one screen.
+        compose.onNodeWithTag("open_drawer").performClick()
+        compose.onNodeWithText(str(R.string.nav_bridge)).assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.nav_test_data)).assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.nav_version)).assertIsDisplayed()
+        compose.onNodeWithText(str(R.string.log_title)).assertIsDisplayed()
+    }
+
+    @Test
     fun testModeCanBeToggledAndIsOffByDefault() {
-        // It lives below the action button on purpose: opt-in, and never in the way of Start.
+        // It has a screen of its own on purpose: opt-in, and never in the way of Start.
+        navigateTo("nav_test_data")
         compose.onNodeWithText(str(R.string.sim_title)).assertExists()
         compose.onNodeWithTag("switch_sim").performScrollTo().performClick()
         compose.onNodeWithTag("switch_sim").performScrollTo().performClick()
+        navigateTo("nav_bridge")
         compose.onNodeWithTag("action_button").assertIsEnabled()
+    }
+
+    @Test
+    fun testModeOnIsAnnouncedOnTheBridgeScreen() {
+        // Transmitting a position that is not yours must never be something you discover
+        // late, least of all now that the switch lives on another screen.
+        navigateTo("nav_test_data")
+        compose.onNodeWithTag("switch_sim").performScrollTo().performClick()
+        navigateTo("nav_bridge")
+        compose.onNodeWithText(str(R.string.sim_active_title)).assertExists()
+
+        // And the notice leads back to the switch that caused it.
+        compose.onNodeWithTag("open_test_data").performScrollTo().performClick()
+        compose.onNodeWithTag("switch_sim").performScrollTo().performClick() // back off
     }
 
     @Test
     fun showsTheInstalledBuildAndAWayToUpdate() {
         // Sideloaded: nothing else tells you whether the phone has the newest build.
+        navigateTo("nav_version")
         compose.onNodeWithText(str(R.string.version_title)).assertExists()
         compose.onNodeWithTag("download_update").assertExists()
     }
@@ -226,18 +254,27 @@ class MainActivityTest {
             }
             compose.onNodeWithTag("action_button").assertIsNotEnabled()
 
+            navigateTo("nav_test_data")
             compose.onNodeWithTag("switch_sim").performScrollTo().performClick()
+            navigateTo("nav_bridge")
 
             compose.waitUntil(timeoutMillis = 5_000) {
                 compose.onAllNodesWithText(str(R.string.net_req_title)).fetchSemanticsNodes().isEmpty()
             }
             compose.onNodeWithTag("action_button").assertIsEnabled()
         } finally {
-            compose.onNodeWithTag("switch_sim").performScrollTo().performClick()
+            // Only the gate needs putting back: the simulated switch lives in the shell's
+            // own state, which goes away with this test's activity.
             NetworkGate.stateProvider = { PAIRED_OVER_HOTSPOT }
         }
     }
 
     private fun hasStopButton() =
         androidx.compose.ui.test.hasText(str(R.string.action_stop))
+
+    /** Opens the side menu and lands on the screen behind [tag]. */
+    private fun navigateTo(tag: String) {
+        compose.onNodeWithTag("open_drawer").performClick()
+        compose.onNodeWithTag(tag).performClick()
+    }
 }
