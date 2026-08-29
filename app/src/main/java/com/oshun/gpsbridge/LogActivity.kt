@@ -9,6 +9,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -60,6 +62,7 @@ class LogActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class) // FlowRow; stable in every Compose this app has shipped on
 @Composable
 private fun LogScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -87,7 +90,13 @@ private fun LogScreen(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodyMedium,
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Wrapping, not a Row: three labels this long overflow a 360 dp phone, and a Row
+        // does not clip visibly — it lays the last button out past the edge, where it still
+        // answers every question except a finger.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Button(
                 onClick = { shareLog(context) },
                 modifier = Modifier.testTag("log_share"),

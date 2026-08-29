@@ -1,5 +1,6 @@
 package com.oshun.gpsbridge
 
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -86,6 +87,17 @@ class LogActivityTest {
         link = "TCP:2000 · 1 cliente",
         sentences = listOf("!AIVDM,1,1,,A,1815C?hP1cKlS`QdC:LUp4hD0000,0*14\r\n"),
     )
+
+    @Test
+    fun everyButtonIsReachableAndNotJustPresent() {
+        // A Row does not clip what does not fit: it lays the last button out past the right
+        // edge, where it still exists, still satisfies assertExists, and cannot be pressed by
+        // a finger. That is how the third button broke the second — so the assertion here is
+        // "displayed", and it is what keeps a fourth one from doing it again in silence.
+        compose.onNodeWithTag("log_share").assertIsDisplayed()
+        compose.onNodeWithTag("log_copy_ais").assertIsDisplayed()
+        compose.onNodeWithTag("log_clear").assertIsDisplayed()
+    }
 
     @Test
     fun theCopyButtonSurvivesBothAnEmptyBridgeAndALiveOne() {
