@@ -187,6 +187,19 @@ voluntaria tenga un receptor cerca, ni de que un proveedor siga existiendo. Y cu
 
 ## 6. Medir la cobertura **hoy, sin salir al agua**
 
+### Un dato del río que mejora el pronóstico
+
+**El Canal Mitre corre siempre a menos de 6 millas de la costa.** Eso importa: el AIS terrestre
+depende de estaciones en tierra con alcance de hasta ~200 km, así que la pregunta deja de ser
+"¿llega la cobertura hasta el canal?" —llega de sobra— y pasa a ser sólo "¿esta red tiene una
+estación en el área de Buenos Aires?". Para un puerto de ese tamaño es mucho más probable que
+sí. No es certeza, pero **mueve la apuesta bastante a favor de la opción gratis**.
+
+Corolario práctico: **un radio de 6 millas ya cubre todo el ancho del canal alrededor tuyo.** Si
+alguna vez pasamos a un proveedor que cobra por barco, ése es el número que hay que usar.
+
+### El experimento
+
 La suscripción es un cuadro de **~18 millas alrededor del teléfono** y se transmiten los
 targets de menos de 12 M. Desde Buenos Aires o el conurbano ribereño **eso ya cubre la rada y
 el canal**.

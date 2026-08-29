@@ -180,13 +180,53 @@ chico. Y lo chico es justamente lo que no ves de noche.
 3. **Conectores.** PL-259/SO-239 arriba; abajo, un *pigtail* a SMA o MCX para el dongle.
    Conectores mal hechos pierden más que 10 metros de cable.
 
-### El problema real: el palo ya tiene la antena del VHF
+### La antena del VHF **es** una antena de AIS
+
+No son cosas distintas: **es la misma banda**. El VHF marino va de 156 a 162 MHz y el AIS está
+en 161,975 / 162,025 — literalmente en el techo de esa banda (canales 87B y 88B).
+
+Están optimizadas cerca de 156 MHz, sí, pero eso pesa **al transmitir**. Para recibir, una
+desadaptación que en TX preocuparía cuesta **menos de 1 dB**. O sea: para una prueba de
+recepción, la antena del palo es prácticamente ideal, y ya tiene puestos la altura y el cable,
+que es lo caro.
+
+### ⚠️ Prueba de concepto con la antena del barco
+
+**El peligro:** si transmitís por el VHF con el dongle conectado a esa antena, **lo quemás en el
+acto**. Son 25 W entrando a un receptor diseñado para microvolts. No se degrada: se destruye.
+
+**Por eso, la regla:** desconectá **físicamente** el equipo de VHF del cable. No alcanza con
+apagarlo — nadie tiene que poder apretar el PTT mientras el dongle está enchufado.
+
+| | |
+|---|---|
+| **Qué hacés** | Sacás el coax del VHF y lo enchufás al dongle |
+| **Qué necesitás** | Adaptador **PL-259/SO-239 → SMA** (un par de dólares) + el dongle |
+| **Qué perdés** | El VHF mientras dure la prueba |
+| **Qué ganás** | La respuesta definitiva: antena real, cable real, altura real |
+
+Es **mejor** prueba que cualquier antena improvisada, precisamente porque prueba la instalación
+final. Si con la antena del palo no ves barcos, ninguna otra cosa lo va a arreglar. Si con una
+telescópica no ves nada, no sabés si fue la antena o la cobertura: resultado inconcluso, que es
+el peor de todos.
+
+Dos detalles prácticos:
+
+- **Descargá la estática antes de enchufar.** Una antena en el tope junta carga y el dongle no
+  tiene protección: tocá brevemente vivo contra malla del conector antes de conectar.
+- **Si tenés antena de emergencia en el balcón de popa, esa es la prueba ideal**: la usás para
+  el dongle y dejás el VHF conectado al palo. Sin desconectar nada, sin riesgo.
+
+**El hardware mínimo para la primera prueba es entonces un dongle y un adaptador** — no una
+antena nueva.
+
+### El problema real a futuro: el palo ya tiene la antena del VHF
 
 Tres caminos:
 
 | Opción | Costo | Contra |
 |---|---|---|
-| **Splitter AIS/VHF activo** (Vesper, Digital Yacht, Comar) | USD 150–250 | Corta la recepción AIS mientras transmitís por voz; degrada algo el resto del tiempo |
+| **Splitter AIS/VHF activo** (Vesper, Digital Yacht, Comar) | USD 150–250 | Corta la recepción AIS mientras transmitís por voz; degrada algo el resto del tiempo. **Es la solución permanente, no la de la prueba** |
 | **Segunda antena al tope** | Antena + cable + trabajo | Espacio, peso e interferencia mutua arriba |
 | **Antena dedicada más abajo** (cruceta, backstay, balcón) | Lo más barato | Menos alcance — mirá la tabla |
 
@@ -202,7 +242,7 @@ trabajo caro; el resto se cambia desde la bañera.
 |---|---|---|---|
 | 1 | Los dos experimentos de Fase 0 | Ahora | $0 |
 | 2 | **Fase 1: entrada NMEA externa** | Después de la 0 | Código chico |
-| 3 | Dongle + cable OTG con carga + antena de prueba | Cuando quieras | ~USD 40 |
+| 3 | Dongle + cable OTG con carga + **adaptador PL-259→SMA** (la antena ya la tenés) | Cuando quieras | ~USD 45 |
 | 4 | Probar con AIS-catcher entrando por la Fase 1 | Enseguida | $0 |
 | 5 | Decidir licencia del repo (§3a) | Antes de la 3 | Una decisión |
 | 6 | Fase 3b: demodulador propio contra grabación | El proyecto grande | Tiempo |
