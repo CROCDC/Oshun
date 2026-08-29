@@ -6,6 +6,7 @@ import com.oshun.gpsbridge.core.DeliveryOutcome
 import com.oshun.gpsbridge.core.EventKind
 import com.oshun.gpsbridge.core.LogEvent
 import com.oshun.gpsbridge.core.StopReason
+import com.oshun.gpsbridge.service.GpsBridgeService
 
 /**
  * Turns the neutral tokens the core produces (outcomes, event kinds, stop reasons) into
@@ -30,6 +31,21 @@ internal fun eventLabel(event: LogEvent): String = when (event.kind) {
     EventKind.CLIENT_DISCONNECTED -> stringResource(R.string.log_client_disconnected, event.detail)
     EventKind.DELIVERY -> outcomeLabel(event.outcome)
     EventKind.SIMULATION -> stringResource(R.string.log_simulation)
+    EventKind.AIS_FEED -> when {
+        event.detail == GpsBridgeService.UP -> stringResource(R.string.log_ais_up)
+        // The first message, kept verbatim: what the feed actually sends is the one thing that
+        // cannot be worked out from here when nothing appears on the chart.
+        event.detail.startsWith(GpsBridgeService.ERROR_PREFIX) ->
+            stringResource(R.string.log_ais_error, event.detail.removePrefix(GpsBridgeService.ERROR_PREFIX))
+        event.detail.startsWith(GpsBridgeService.RAW_PREFIX) ->
+            stringResource(R.string.log_ais_sample, event.detail.removePrefix(GpsBridgeService.RAW_PREFIX))
+        // The reason the server gave, when it gave one: a rejected key and empty water are
+        // indistinguishable without it.
+        event.detail.startsWith(GpsBridgeService.DOWN_PREFIX) &&
+            event.detail.length > GpsBridgeService.DOWN_PREFIX.length ->
+            stringResource(R.string.log_ais_down_reason, event.detail.removePrefix(GpsBridgeService.DOWN_PREFIX))
+        else -> stringResource(R.string.log_ais_down)
+    }
     EventKind.FIX -> if (event.fixValid == true) {
         stringResource(R.string.log_fix_ok)
     } else {

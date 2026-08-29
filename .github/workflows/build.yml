@@ -150,7 +150,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug -PgitSha=${{ github.sha }}
+        run: ./gradlew assembleDebug -PgitSha=${{ github.sha }} -PversionCode=${{ github.run_number }}
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -169,4 +169,7 @@ jobs:
           body: |
             APK de debug del último build verde (pasó unit + instrumentados).
             Commit: ${{ github.sha }}
+            versionCode: ${{ github.run_number }}
+
+            Se instala encima de la versión anterior sin desinstalar.
           files: app/build/outputs/apk/debug/app-debug.apk

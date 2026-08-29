@@ -10,11 +10,11 @@
     <string name="label_interval">Intervalo de actualización</string>
     <string name="switch_autooff">Apagado automático sin clientes (15 min)</string>
     <string name="switch_rawlog">Registrar cada posición en un CSV</string>
-    <string name="net_req_title">Requisitos de red</string>
-    <string name="net_req_body">El puente solo transmite sobre un enlace que zarpa con vos: el cable USB entre el teléfono y la tablet, o el hotspot del teléfono. En la amarra el Wi-Fi del club alcanza a los dos aparatos y parece que anda, pero a los pocos metros te quedás sin red y la carta se congela.</string>
+    <string name="net_req_title">Cómo se conectan los dos aparatos</string>
+    <string name="net_req_body">Hay dos enlaces que zarpan con vos y cualquiera de los dos sirve igual: el hotspot del teléfono o un cable USB entre los dos aparatos. Por el que elijas va todo — la posición y los targets AIS van por la misma conexión. Lo que no sirve es una Wi-Fi ajena: en la amarra el Wi-Fi del club alcanza a los dos aparatos y parece que anda, pero a los pocos metros te quedás sin red y la carta se congela.</string>
     <string name="net_req_cable">Cable USB entre el teléfono y la tablet</string>
-    <string name="net_req_or">— o, si no hay cable —</string>
-    <string name="net_req_cable_hint">Con el cable puesto, prendé «Anclaje por USB» en el teléfono. Si la tablet no lo reconoce, no todas lo hacen: usá el hotspot.</string>
+    <string name="net_req_or">— o bien —</string>
+    <string name="net_req_cable_hint">Con el cable puesto, prendé «Anclaje por USB» en el teléfono. No todas las tablets lo reconocen; si la tuya no, el hotspot hace exactamente lo mismo.</string>
     <string name="net_req_body_sim">En modo prueba alcanza con que el teléfono y la tablet estén en la misma red: la corrida no sale del escritorio. Prendé el hotspot o conectate a una Wi-Fi.</string>
     <string name="net_req_any">Alguna red local disponible</string>
     <string name="net_req_hotspot">Hotspot del teléfono encendido</string>
@@ -33,6 +33,14 @@
     <string name="status_ip">IP del teléfono</string>
     <string name="status_link">Enlace</string>
     <string name="status_ais">Targets AIS</string>
+    <string name="status_ais_feed">Feed AIS</string>
+    <!-- %1$d: mensajes recibidos del feed -->
+    <string name="status_ais_feed_up">conectado · %1$d mensajes</string>
+    <string name="status_ais_feed_down">caído · %1$d mensajes</string>
+    <!-- %1$s: el enlace, %2$s: la IP -->
+    <string name="status_other_address">%1$s: %2$s</string>
+    <string name="status_other_addresses">Otras direcciones</string>
+    <string name="status_other_hint">El teléfono está en más de una red. Si Navionics no engancha, probá con la otra dirección.</string>
     <string name="link_cable">cable USB</string>
     <string name="link_hotspot">hotspot del teléfono</string>
     <string name="link_other">red ajena (no zarpa con vos)</string>
@@ -78,6 +86,21 @@
     <string name="sim_title">Modo prueba</string>
     <string name="sim_body">Transmite un barco simulado navegando en el Río de la Plata entre dos puntos separados 12 M, a 4 nudos (3 h por tramo, ida y vuelta). Sirve para probar Navionics de punta a punta sin salir al agua. Lo que sale por la red es idéntico a una navegación real: el aviso está acá, en el registro y en la notificación.</string>
     <string name="switch_sim">Transmitir barco simulado</string>
+    <string name="ais_title">Barcos AIS (internet)</string>
+    <string name="ais_body">Muestra en la carta los barcos que un servicio de internet reporta cerca tuyo. Necesita datos: en el canal suele haber señal, mar afuera no. Va por la misma conexión que tu posición, así que anda igual por hotspot o por cable.</string>
+    <string name="ais_warning">No sirve para evitar colisiones. Los datos llegan con demora, y sólo aparecen los barcos que transmiten AIS: lanchas, pescadores y todo lo que no transmite no está. Si el feed se corta, la app deja de mandar targets en vez de dejarte fantasmas en la carta.</string>
+    <string name="switch_ais">Transmitir barcos AIS de internet</string>
+    <string name="ais_key_label">API key de aisstream.io</string>
+    <string name="ais_key_hint">Se saca gratis en aisstream.io. Queda guardada sólo en este teléfono.</string>
+    <string name="ais_key_missing">Falta la API key: sin eso no se puede conectar al feed.</string>
+    <string name="log_ais_up">Feed AIS conectado</string>
+    <string name="log_ais_down">Feed AIS caído: se dejan de mostrar otros barcos</string>
+    <!-- %1$s: lo que dijo el servidor al cortar -->
+    <string name="log_ais_down_reason">Feed AIS caído (%1$s)</string>
+    <!-- %1$s: lo que respondió el servicio -->
+    <string name="log_ais_error">Feed AIS rechazado: %1$s</string>
+    <!-- %1$s: el mensaje tal como llegó, recortado -->
+    <string name="log_ais_sample">Primer mensaje del feed: %1$s</string>
     <string name="sim_ais">Además transmite dos barcos AIS de prueba: un carguero a 12 nudos que cruza tu rumbo por el medio del tramo, y una lancha de pesca a 3 nudos cerca del primer waypoint. Sirven para ver si Navionics dibuja los targets. Se llaman TEST y sus MMSI no pertenecen a nadie.</string>
 
     <!-- Registro -->
@@ -110,8 +133,9 @@
     <!-- Versión -->
     <string name="version_title">Versión instalada</string>
     <!-- %1$s: versión, %2$s: commit -->
-    <string name="version_value">v%1$s · build %2$s</string>
-    <string name="version_hint">Cada build verde publica un APK nuevo en GitHub Releases. Comparalo con el commit de arriba para saber si estás al día.</string>
+    <!-- %1$s: versionName, %2$d: versionCode, %3$s: commit -->
+    <string name="version_value">v%1$s · build %2$d · %3$s</string>
+    <string name="version_hint">Cada build verde publica un APK nuevo en GitHub Releases. El número de build sube en cada uno: si el de Releases es mayor, estás atrasado. Se instala encima sin desinstalar.</string>
     <string name="version_download">Descargar la última versión</string>
 
     <!-- Crash screen -->

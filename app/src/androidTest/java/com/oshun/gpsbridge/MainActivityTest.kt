@@ -13,6 +13,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
+import com.oshun.gpsbridge.net.Link
+import com.oshun.gpsbridge.net.LinkAddress
 import com.oshun.gpsbridge.net.NetworkRequirements
 import com.oshun.gpsbridge.core.BridgeConfig
 import com.oshun.gpsbridge.location.FixProvider
@@ -55,6 +57,19 @@ class MainActivityTest {
             hotspotUp = true,
             wifiOff = true,
             address = "192.168.43.1",
+            addresses = listOf(LinkAddress(Link.HOTSPOT, "192.168.43.1")),
+        )
+
+        /** Tethering left on while the tablet sits on the hotspot: two addresses, one advertised. */
+        val BOTH_LINKS_UP = NetworkRequirements(
+            hotspotUp = true,
+            wifiOff = true,
+            cableUp = true,
+            address = "192.168.42.129",
+            addresses = listOf(
+                LinkAddress(Link.CABLE, "192.168.42.129"),
+                LinkAddress(Link.HOTSPOT, "192.168.43.1"),
+            ),
         )
 
         @AfterClass
@@ -186,6 +201,30 @@ class MainActivityTest {
                 compose.onAllNodesWithText(str(R.string.net_req_title)).fetchSemanticsNodes().isNotEmpty()
             }
             compose.onNodeWithTag("action_button").assertIsNotEnabled()
+        } finally {
+            NetworkGate.stateProvider = { PAIRED_OVER_HOTSPOT }
+        }
+    }
+
+    @Test
+    fun withBothLinksUpItNamesTheAddressItIsNotAdvertising() {
+        // Only one address can be advertised, and the tablet may well be on the other one.
+        // Left unsaid, that is indistinguishable from a bridge that does not work.
+        NetworkGate.stateProvider = { BOTH_LINKS_UP }
+        try {
+            // The screen re-reads the network once a second, so the swapped state does not
+            // reach the card the instant the bridge starts. Wait for it, like every other
+            // assertion here on something published outside this thread.
+            compose.onNodeWithTag("action_button").performScrollTo().performClick()
+            compose.waitUntil(timeoutMillis = 10_000) {
+                compose.onAllNodes(hasStopButton()).fetchSemanticsNodes().isNotEmpty() &&
+                    compose.onAllNodesWithText(str(R.string.status_other_addresses))
+                        .fetchSemanticsNodes().isNotEmpty()
+            }
+
+            compose.onNodeWithText("192.168.43.1", substring = true).assertExists()
+
+            compose.onNodeWithTag("action_button").performScrollTo().performClick()
         } finally {
             NetworkGate.stateProvider = { PAIRED_OVER_HOTSPOT }
         }

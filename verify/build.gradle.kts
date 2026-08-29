@@ -10,6 +10,9 @@ repositories {
 dependencies {
     // Needed by core/ (BridgeState uses kotlinx StateFlow).
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+    // net/ parses the AIS feed with org.json, which Android ships in its framework and a
+    // plain JVM does not. Same API, so the same source compiles here and in the app.
+    implementation("org.json:json:20240303")
     testImplementation("junit:junit:4.13.2")
 }
 

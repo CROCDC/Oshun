@@ -20,6 +20,15 @@ data class BridgeConfig(
     val rawLogEnabled: Boolean = true,
     /** Test mode: transmit the simulated Río de la Plata track instead of the phone's GPS. */
     val simulated: Boolean = false,
+    /**
+     * Forward the vessels an internet AIS feed reports around us. Off by default: it needs a
+     * key, it needs data, and what it shows is delayed and incomplete.
+     *
+     * The API key is deliberately not part of this config. Config travels in intents, is
+     * written to SharedPreferences by the codec and names itself in the CSV header; a
+     * credential has no business in any of those.
+     */
+    val aisEnabled: Boolean = false,
 )
 
 /** Live status published by the foreground service and observed by the UI. */
@@ -46,6 +55,13 @@ data class BridgeStatus(
     val simulated: Boolean = false,
     /** How many other vessels are going out on the stream as AIS targets. */
     val aisTargets: Int = 0,
+    /** Whether the internet AIS feed is connected right now. */
+    val aisFeedConnected: Boolean = false,
+    /**
+     * Messages received from the feed. Together with [aisTargets] this tells three different
+     * stories apart: no connection, connection without traffic, and traffic we fail to read.
+     */
+    val aisMessages: Long = 0,
     /** Sentences emitted as heartbeat (a resend of the last fix), included in [sentencesSent]. */
     val heartbeatsSent: Long = 0,
     val batteryPercent: Int? = null,

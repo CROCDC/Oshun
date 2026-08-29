@@ -57,6 +57,7 @@ import com.oshun.gpsbridge.core.StopReason
 import com.oshun.gpsbridge.net.Link
 import com.oshun.gpsbridge.net.NetworkRequirements
 import com.oshun.gpsbridge.service.GpsBridgeService
+import com.oshun.gpsbridge.store.AisKeyStore
 import com.oshun.gpsbridge.store.ConfigStore
 import kotlinx.coroutines.delay
 
@@ -99,6 +100,10 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
     // Drives the "hace N s" counters, so a stalled bridge is visible without touching anything.
     var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
     var batteryUnrestricted by remember { mutableStateOf(isIgnoringBatteryOptimizations(context)) }
+    var aisEnabled by remember { mutableStateOf(saved.aisEnabled) }
+    // The key lives in its own store, never in the config: config rides in intents, lands in
+    // SharedPreferences as one string and names itself in the CSV header.
+    var aisKey by remember { mutableStateOf(AisKeyStore.load(context)) }
     LaunchedEffect(Unit) {
         while (true) {
             network = NetworkGate.state(context)
@@ -130,6 +135,7 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
                     autoOffEnabled = autoOffEnabled,
                     rawLogEnabled = rawLogEnabled,
                     simulated = simulated,
+                    aisEnabled = aisEnabled,
                 ),
             )
         }
@@ -233,6 +239,17 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
             onChange = { simulated = it },
         )
 
+        AisFeedCard(
+            enabled = aisEnabled,
+            editable = !status.running,
+            apiKey = aisKey,
+            onChange = { aisEnabled = it },
+            onKeyChange = {
+                aisKey = it
+                AisKeyStore.save(context, it)
+            },
+        )
+
         // Advisory banners live below the action button: they explain and suggest, and
         // pushing the primary action off screen to show them is the wrong trade.
         if (lastStop == StopReason.IDLE_TIMEOUT && !status.running) {
@@ -246,7 +263,7 @@ private fun BridgeScreen(modifier: Modifier = Modifier) {
             BatteryOptimizationBanner(onFix = { openBatteryOptimizationSettings(context) })
         }
 
-        if (status.running) StatusCard(status, network.link, nowMillis)
+        if (status.running) StatusCard(status, network, nowMillis)
 
         InstructionsCard()
 
@@ -328,22 +345,8 @@ private fun NetworkRequirementsCard(
                     onFix = onOpenHotspot,
                 )
             } else {
-                // The cable is enough on its own; the hotspot rows below are the alternative.
-                RequirementRow(
-                    met = network.cableUp,
-                    label = stringResource(R.string.net_req_cable),
-                    actionLabel = stringResource(R.string.net_open_usb),
-                    tag = "fix_usb",
-                    onFix = onOpenHotspot, // the tethering screen is where USB tethering lives
-                )
-                Text(
-                    stringResource(R.string.net_req_cable_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Text(
-                    stringResource(R.string.net_req_or),
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                // Either link is a complete answer, so these are two ways of getting there
+                // rather than a preference: the hotspot first because it needs no hardware.
                 RequirementRow(
                     met = network.hotspotUp,
                     label = stringResource(R.string.net_req_hotspot),
@@ -357,6 +360,21 @@ private fun NetworkRequirementsCard(
                     actionLabel = stringResource(R.string.net_open_wifi),
                     tag = "fix_wifi",
                     onFix = onOpenWifi,
+                )
+                Text(
+                    stringResource(R.string.net_req_or),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                RequirementRow(
+                    met = network.cableUp,
+                    label = stringResource(R.string.net_req_cable),
+                    actionLabel = stringResource(R.string.net_open_usb),
+                    tag = "fix_usb",
+                    onFix = onOpenHotspot, // the tethering screen is where USB tethering lives
+                )
+                Text(
+                    stringResource(R.string.net_req_cable_hint),
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
@@ -420,6 +438,50 @@ private fun openHotspotSettings(context: Context) {
             return
         } catch (e: Exception) {
             // Try the next candidate.
+        }
+    }
+}
+
+/**
+ * The internet AIS feed: opt in, and say plainly what it is not.
+ *
+ * The warning is not decoration. Targets arrive delayed, only vessels that transmit AIS are
+ * in them at all, and on this river most of what can hit you transmits nothing — a chart
+ * that looks empty because the feed is thin is the most dangerous thing this feature could
+ * produce.
+ */
+@Composable
+private fun AisFeedCard(
+    enabled: Boolean,
+    editable: Boolean,
+    apiKey: String,
+    onChange: (Boolean) -> Unit,
+    onKeyChange: (String) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.ais_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.ais_body), style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.ais_warning), style = MaterialTheme.typography.bodyMedium)
+            SwitchRow(stringResource(R.string.switch_ais), "switch_ais", enabled, editable, onChange)
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = onKeyChange,
+                label = { Text(stringResource(R.string.ais_key_label)) },
+                enabled = editable,
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("ais_key"),
+            )
+            Text(stringResource(R.string.ais_key_hint), style = MaterialTheme.typography.bodySmall)
+            if (enabled && apiKey.isBlank()) {
+                Text(
+                    stringResource(R.string.ais_key_missing),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
 }
@@ -508,7 +570,7 @@ private fun CrashBanner(onView: () -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun StatusCard(status: BridgeStatus, link: Link?, nowMillis: Long) {
+private fun StatusCard(status: BridgeStatus, network: NetworkRequirements, nowMillis: Long) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(R.string.status_title), style = MaterialTheme.typography.titleMedium)
@@ -520,9 +582,37 @@ private fun StatusCard(status: BridgeStatus, link: Link?, nowMillis: Long) {
                 )
             }
             KeyValue(stringResource(R.string.status_ip), status.ipAddress ?: stringResource(R.string.status_no_wifi))
-            link?.let { KeyValue(stringResource(R.string.status_link), linkText(it)) }
+            network.link?.let { KeyValue(stringResource(R.string.status_link), linkText(it)) }
+            // Both links can be up at once and only one address is advertised. Naming the
+            // others is the difference between "it does not work" and "pair with that one".
+            val others = network.otherAddresses()
+            if (others.isNotEmpty()) {
+                // Resolved in the composable's own scope: joinToString takes a noinline
+                // lambda, and stringResource cannot be called from inside one.
+                val labels = mutableListOf<String>()
+                for (other in others) {
+                    labels += stringResource(R.string.status_other_address, linkText(other.link), other.ipv4)
+                }
+                KeyValue(stringResource(R.string.status_other_addresses), labels.joinToString(" · "))
+                Text(
+                    stringResource(R.string.status_other_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             if (status.aisTargets > 0) {
                 KeyValue(stringResource(R.string.status_ais), status.aisTargets.toString())
+            }
+            // Connection and message count next to the target count: apart, they say whether a
+            // silent chart is a dead feed, empty water, or sentences we are failing to read.
+            if (status.aisFeedConnected || status.aisMessages > 0) {
+                KeyValue(
+                    stringResource(R.string.status_ais_feed),
+                    if (status.aisFeedConnected) {
+                        stringResource(R.string.status_ais_feed_up, status.aisMessages)
+                    } else {
+                        stringResource(R.string.status_ais_feed_down, status.aisMessages)
+                    },
+                )
             }
             KeyValue(stringResource(R.string.status_port), status.port.toString())
             val protocols = BridgeLogic.enabledProtocols(status)
@@ -572,7 +662,12 @@ private fun VersionCard(onDownload: () -> Unit) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.version_title), style = MaterialTheme.typography.titleMedium)
             Text(
-                stringResource(R.string.version_value, BuildConfig.VERSION_NAME, BuildConfig.GIT_SHA),
+                stringResource(
+                    R.string.version_value,
+                    BuildConfig.VERSION_NAME,
+                    BuildConfig.VERSION_CODE,
+                    BuildConfig.GIT_SHA,
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 fontFamily = FontFamily.Monospace,
             )
