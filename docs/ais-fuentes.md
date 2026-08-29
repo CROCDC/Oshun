@@ -132,6 +132,26 @@ exactamente lo que hablamos.
 | **Contra** | La app salió del Play Store (regla de datos personales del desarrollador); el APK se baja de su GitHub |
 | **Contra** | La antena manda: con una berreta vas a ver poco. Una VHF marina decente cambia todo |
 
+### Lista de hardware, y dónde se equivoca la gente
+
+| Pieza | Qué comprar | La trampa |
+|---|---|---|
+| **Dongle** | RTL-SDR v3/v4, USD ~30–40 | Cualquiera cubre 162 MHz. AIS-catcher hace **los dos canales** (161,975 y 162,025) con uno solo |
+| **Cable / hub** | OTG **con entrada de carga** (PD passthrough) | **Acá se equivoca todo el mundo:** muchos hubs USB-C que dicen "OTG" no tienen Power Delivery. Sin carga, el SDR + GPS + hotspot te funden la batería |
+| **Antena** | Para probar, la telescópica del dongle a **46 cm** (¼ de onda a 162 MHz). Para el río, una VHF marina | **Manda la altura, no la ganancia.** Y una VHF marina está sintonizada a ~156 MHz: anda, pero no óptimo a 162 |
+
+Alcance: hasta ~75 km en línea de vista con la antena bien puesta; con la telescópica adentro de
+la bañera, mucho menos.
+
+**Dos advertencias que cuestan plata:**
+
+- **No compartas la antena del VHF sin un splitter AIS.** El splitter deja usar una sola antena,
+  pero **corta la recepción mientras transmitís** por voz y degrada la recepción el resto del
+  tiempo. Una antena propia, aunque sea modesta, suele rendir mejor.
+- **OTG y anclaje por USB son excluyentes.** Un puerto no puede ser *host* y *dispositivo* a la
+  vez: con el dongle puesto, la tablet va **por hotspot, sí o sí**. Otra razón por la que estuvo
+  bien poner los dos enlaces en pie de igualdad.
+
 ### Cómo encaja con Oshun
 
 ```
@@ -146,6 +166,17 @@ es justamente lo que Navionics necesita, porque empareja **un** dispositivo.
 Eso implica una feature concreta y chica: **entrada NMEA externa por UDP**. Y es la misma pieza
 que haría falta para el feed crudo de VesselFinder (§1), así que construir una deja la otra
 casi hecha.
+
+### Antes de que yo escriba una línea: probá si Navionics acepta dos fuentes
+
+AIS-catcher ya puede mandar NMEA por UDP a una app de plotteo. **Si Navionics admite dos
+dispositivos emparejados simultáneos** —AIS-catcher para los barcos, Oshun para tu posición—
+entonces **no hace falta escribir nada**: el multiplexado sobra.
+
+Se prueba gratis y hoy: agregá un segundo *paired device* en Navionics y fijate si convive con
+el primero o si el segundo pisa al primero. Mi sospecha es que un plotter toma una sola fuente
+—de ahí el diseño multiplexor— pero **no lo verifiqué**, y verificarlo puede ahorrar la feature
+entera.
 
 **Por qué esto le gana a cualquier API:** no depende de que haya señal, ni de que una red
 voluntaria tenga un receptor cerca, ni de que un proveedor siga existiendo. Y cuesta una vez.
