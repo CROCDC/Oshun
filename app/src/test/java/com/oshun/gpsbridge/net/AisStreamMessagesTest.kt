@@ -152,4 +152,17 @@ class AisStreamMessagesTest {
     fun aShortMessageSurvivesWhole() {
         assertEquals("{}", AisStreamMessages.sample("  {}\n ", max = 60))
     }
+
+    @Test
+    fun readsTheFeedsOwnRefusal() {
+        // What the service actually sends before hanging up on a bad key. Read as a vessel
+        // report it is unreadable and would vanish; read as itself it is the whole diagnosis.
+        assertEquals(
+            "Api Key Is Not Valid",
+            AisStreamMessages.errorOf("""{"error": "Api Key Is Not Valid"}"""),
+        )
+        assertNull(AisStreamMessages.errorOf(positionReport))
+        assertNull(AisStreamMessages.errorOf("no json"))
+        assertNull(AisStreamMessages.errorOf("""{"error": ""}"""))
+    }
 }

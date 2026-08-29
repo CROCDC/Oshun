@@ -44,7 +44,17 @@ class AisStreamFeed(
         .build()
 
     @Volatile private var socket: WebSocket? = null
+
+    /**
+     * The socket once the handshake finished, which is not the same thing as [socket].
+     *
+     * Telling them apart is the whole point: `newWebSocket` returns before the connection is
+     * open, and a subscription sent into that gap is a second subscription — the feed closes
+     * a connection that updates its subscription more than once a second.
+     */
+    @Volatile private var openSocket: WebSocket? = null
     @Volatile private var subscribedCentre: Position? = null
+    @Volatile private var lastSubscriptionAtMillis = 0L
     @Volatile private var lastKnown: Position? = null
     @Volatile private var running = false
     @Volatile private var attempt = 0
@@ -60,9 +70,16 @@ class AisStreamFeed(
     fun onOwnPosition(position: Position) {
         lastKnown = position
         if (!running) return
-        val open = socket
-        if (open == null) connect(position)
-        else if (AisSubscription.shouldResubscribe(subscribedCentre, position)) subscribe(open, position)
+        if (socket == null) {
+            connect(position)
+            return
+        }
+        // Only over a connection that actually finished opening, and never faster than the
+        // feed tolerates. Fixes arrive once a second; subscriptions must not.
+        val open = openSocket ?: return
+        val now = System.currentTimeMillis()
+        if (now - lastSubscriptionAtMillis < MIN_SUBSCRIPTION_INTERVAL_MILLIS) return
+        if (AisSubscription.shouldResubscribe(subscribedCentre, position)) subscribe(open, position)
     }
 
     fun stop() {
@@ -71,6 +88,7 @@ class AisStreamFeed(
         retry = null
         socket?.close(NORMAL_CLOSURE, null)
         socket = null
+        openSocket = null
         subscribedCentre = null
     }
 
@@ -81,12 +99,15 @@ class AisStreamFeed(
     }
 
     private fun subscribe(open: WebSocket, centre: Position) {
-        if (open.send(AisSubscription.message(apiKey, centre))) subscribedCentre = centre
+        if (!open.send(AisSubscription.message(apiKey, centre))) return
+        subscribedCentre = centre
+        lastSubscriptionAtMillis = System.currentTimeMillis()
     }
 
     /** Drops the socket and comes back for it, backing off so a bad key is not hammered. */
     private fun scheduleReconnect() {
         socket = null
+        openSocket = null
         subscribedCentre = null
         if (!running) return
         val wait = RECONNECT_DELAYS_MILLIS[attempt.coerceAtMost(RECONNECT_DELAYS_MILLIS.lastIndex)]
@@ -105,6 +126,7 @@ class AisStreamFeed(
 
         override fun onOpen(webSocket: WebSocket, response: Response) {
             attempt = 0
+            openSocket = webSocket
             subscribe(webSocket, lastKnown ?: centre)
             onConnected(true, "")
         }
@@ -162,5 +184,13 @@ class AisStreamFeed(
          * there is no point burning the battery on it.
          */
         val RECONNECT_DELAYS_MILLIS = listOf(2_000L, 5_000L, 15_000L, 30_000L, 60_000L)
+
+        /**
+         * Floor between subscription updates. The feed documents that it closes a connection
+         * whose subscription changes more than once a second; ten seconds is far from that
+         * line and still follows the boat, since the box is renewed every five miles — nearly
+         * an hour at six knots.
+         */
+        const val MIN_SUBSCRIPTION_INTERVAL_MILLIS = 10_000L
     }
 }

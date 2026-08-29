@@ -35,6 +35,8 @@ internal fun eventLabel(event: LogEvent): String = when (event.kind) {
         event.detail == GpsBridgeService.UP -> stringResource(R.string.log_ais_up)
         // The first message, kept verbatim: what the feed actually sends is the one thing that
         // cannot be worked out from here when nothing appears on the chart.
+        event.detail.startsWith(GpsBridgeService.ERROR_PREFIX) ->
+            stringResource(R.string.log_ais_error, event.detail.removePrefix(GpsBridgeService.ERROR_PREFIX))
         event.detail.startsWith(GpsBridgeService.RAW_PREFIX) ->
             stringResource(R.string.log_ais_sample, event.detail.removePrefix(GpsBridgeService.RAW_PREFIX))
         // The reason the server gave, when it gave one: a rejected key and empty water are

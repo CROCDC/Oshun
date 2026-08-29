@@ -97,6 +97,8 @@
     <string name="log_ais_down">Feed AIS caído: se dejan de mostrar otros barcos</string>
     <!-- %1$s: lo que dijo el servidor al cortar -->
     <string name="log_ais_down_reason">Feed AIS caído (%1$s)</string>
+    <!-- %1$s: lo que respondió el servicio -->
+    <string name="log_ais_error">Feed AIS rechazado: %1$s</string>
     <!-- %1$s: el mensaje tal como llegó, recortado -->
     <string name="log_ais_sample">Primer mensaje del feed: %1$s</string>
     <string name="sim_ais">Además transmite dos barcos AIS de prueba: un carguero a 12 nudos que cruza tu rumbo por el medio del tramo, y una lancha de pesca a 3 nudos cerca del primer waypoint. Sirven para ver si Navionics dibuja los targets. Se llaman TEST y sus MMSI no pertenecen a nadie.</string>

@@ -31,6 +31,19 @@ object AisStreamMessages {
     private const val HEADING_UNAVAILABLE = 511.0
 
     /**
+     * The feed's own complaint, when it sends one.
+     *
+     * It refuses in a text frame before closing — `{"error": "Api Key Is Not Valid"}` — and
+     * that sentence is the entire diagnosis. Read as a vessel report it is simply unreadable
+     * and would be dropped in silence.
+     */
+    fun errorOf(json: String): String? = try {
+        JSONObject(json).optString("error").takeIf { it.isNotBlank() }
+    } catch (e: Exception) {
+        null
+    }
+
+    /**
      * A message cut down to something a log line can hold.
      *
      * This exists for the case that cannot be debugged any other way: the feed connects,

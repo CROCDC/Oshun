@@ -135,6 +135,30 @@ class AisStreamFeedTest {
     }
 
     @Test
+    fun neverSubscribesTwiceInARow() {
+        // The bug from the water. newWebSocket returns before the connection opens, so the
+        // next fix — one second later — used to find a socket with no subscription recorded
+        // and send a second one. The feed closes a connection whose subscription changes more
+        // than once a second, which is exactly the connect/drop loop that showed up in the log.
+        acceptConnection()
+        val bridge = feed()
+        bridge.start()
+
+        repeat(5) {
+            bridge.onOwnPosition(Position(here.latitude + it * 0.5, here.longitude))
+            Thread.sleep(200)
+        }
+
+        assertNotNull("the feed never subscribed", subscriptions.await())
+        // Half a degree a step is far past the resubscribe threshold, so without the guard
+        // every one of those would have gone out.
+        Thread.sleep(500)
+        assertTrue("sent ${subscriptions.size + 1} subscriptions in a second", subscriptions.isEmpty())
+
+        bridge.stop()
+    }
+
+    @Test
     fun aServerThatHangsUpSaysWhy() {
         // The failure that sent us here: the socket opens, the server refuses and closes, and
         // without its reason a rejected key is indistinguishable from empty water.

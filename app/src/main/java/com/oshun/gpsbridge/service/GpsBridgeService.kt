@@ -333,6 +333,10 @@ class GpsBridgeService : Service() {
     private fun onAisMessage(raw: String) {
         aisMessages += 1
         val now = System.currentTimeMillis()
+        // The feed refuses in a message, not only in the close: log that sentence as itself.
+        AisStreamMessages.errorOf(raw)?.let { error ->
+            EventLog.record(LogEvent(atMillis = now, kind = EventKind.AIS_FEED, detail = ERROR_PREFIX + error))
+        }
         if (aisMessages == 1L) {
             EventLog.record(
                 LogEvent(atMillis = now, kind = EventKind.AIS_FEED, detail = RAW_PREFIX + AisStreamMessages.sample(raw)),
@@ -725,6 +729,9 @@ class GpsBridgeService : Service() {
         /** The feed's state in the log: up, or down with whatever the server said on the way out. */
         const val UP = "up"
         const val DOWN_PREFIX = "down:"
+
+        /** Marks a log entry carrying the feed's own refusal, in its words. */
+        const val ERROR_PREFIX = "error:"
 
         /** How often the message counter reaches the screen. */
         private const val AIS_COUNT_INTERVAL_MILLIS = 1_000L
