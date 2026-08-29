@@ -482,6 +482,47 @@ class GpsBridgeServiceTest {
     }
 
     @Test
+    fun everySendCarriesTheTrafficAlongWithTheFix() {
+        // A plotter that hears the boat move without the vessels around it draws them a step
+        // behind: the traffic goes out in the same send as the position, not on its own clock.
+        val port = freePort()
+        GpsBridgeService.fixProviderFactory = {
+            throw IllegalStateException("test mode must not touch the phone's GPS")
+        }
+
+        val service = startService(port, tcp = true, udp = false, simulated = true)
+        awaitRunning(true)
+
+        val client = connect(port)
+        val reader = BufferedReader(client.getInputStream().reader(Charsets.US_ASCII))
+        val lines = buildList {
+            repeat(MAX_LINES_READ) { add(reader.readLine() ?: return@repeat) }
+        }
+
+        // Every batch opens with the GPRMC, so what follows one belongs to that same send.
+        val sends = mutableListOf<MutableList<String>>()
+        lines.forEach { line ->
+            if (line.startsWith("\$GPRMC")) sends.add(mutableListOf())
+            sends.lastOrNull()?.add(line)
+        }
+
+        // The last one was cut off mid-send by the read limit; the rest are whole.
+        val whole = sends.dropLast(1)
+        assertTrue("too few sends to tell a cadence from a coincidence: $lines", whole.size >= 3)
+        whole.forEach { send ->
+            assertEquals(
+                "a send went out without the traffic: $send",
+                2,
+                send.count { it.startsWith("!AIVDM") && it.split(",")[5].startsWith("1") },
+            )
+        }
+
+        client.close()
+        stop(service)
+        awaitRunning(false)
+    }
+
+    @Test
     fun aRealNavigationCarriesNoSimulatedTraffic() {
         // Inventing vessels on a live chart is the one failure this feature could cause, so
         // the guard gets its own test rather than being a line nobody exercises.

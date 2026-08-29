@@ -202,17 +202,17 @@ class BridgeLogicTest {
     }
 
     @Test
-    fun aisPositionsGoOutOnTheirOwnSlowerClock() {
-        // Repeating every target with every fix would triple the traffic to say nothing new.
+    fun aisNamesGoOutOnTheirOwnSlowerClock() {
+        // The positions ride every batch; only the names wait, and never less than their minute.
         val now = 100_000L
-        assertTrue("nothing sent yet", BridgeLogic.shouldEmitAgain(now, 0L, BridgeLogic.AIS_POSITION_INTERVAL_MILLIS))
-        assertFalse(BridgeLogic.shouldEmitAgain(now, now - 1_000L, BridgeLogic.AIS_POSITION_INTERVAL_MILLIS))
+        assertTrue("nothing sent yet", BridgeLogic.shouldEmitAgain(now, 0L, BridgeLogic.AIS_STATIC_INTERVAL_MILLIS))
+        assertFalse(BridgeLogic.shouldEmitAgain(now, now - 1_000L, BridgeLogic.AIS_STATIC_INTERVAL_MILLIS))
         assertTrue(
-            BridgeLogic.shouldEmitAgain(now, now - BridgeLogic.AIS_POSITION_INTERVAL_MILLIS, BridgeLogic.AIS_POSITION_INTERVAL_MILLIS),
-        )
-        assertTrue(
-            "names go out far more rarely than positions",
-            BridgeLogic.AIS_STATIC_INTERVAL_MILLIS > BridgeLogic.AIS_POSITION_INTERVAL_MILLIS,
+            BridgeLogic.shouldEmitAgain(
+                now,
+                now - BridgeLogic.AIS_STATIC_INTERVAL_MILLIS,
+                BridgeLogic.AIS_STATIC_INTERVAL_MILLIS,
+            ),
         )
     }
 
