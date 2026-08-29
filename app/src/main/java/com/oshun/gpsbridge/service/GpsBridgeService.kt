@@ -96,8 +96,7 @@ class GpsBridgeService : Service() {
     /** When this session started, so the simulated traffic sails the same clock as the boat. */
     private var simulationStartedAtMillis = 0L
 
-    /** When the AIS targets' positions and names last went out; they run slower than a fix. */
-    private var lastAisAtMillis = 0L
+    /** When the AIS names last went out; the positions go with every fix, the names do not. */
     private var lastAisNamesAtMillis = 0L
 
     /** The live connection to the internet AIS feed, when the user turned it on. */
@@ -201,7 +200,6 @@ class GpsBridgeService : Service() {
             EventLog.record(LogEvent(atMillis = startedAt, kind = EventKind.SIMULATION))
         }
         simulationStartedAtMillis = startedAt
-        lastAisAtMillis = 0L
         lastAisNamesAtMillis = 0L
         if (newConfig.rawLogEnabled) {
             TrackLogWriter.open(this, TrackLogFormatter.sessionHeader(startedAt, newConfig))
@@ -283,20 +281,18 @@ class GpsBridgeService : Service() {
     }
 
     /**
-     * The simulated traffic to append to this batch, or nothing outside test mode.
+     * The traffic to append to this batch: invented in test mode, whatever the feed still
+     * stands behind otherwise, and nothing when neither is on.
      *
      * Targets travel on the same stream as our own position — that is how a plotter takes
-     * them — but on their own, slower clock: a real transponder does not repeat itself once
-     * a second, and the names go out rarer still.
+     * them — and in the same batch: one send carries where we are and what is around us, so
+     * the chart never moves the boat between vessels that have not been redrawn yet. Only
+     * the names run slower, because a name is not news twice.
      */
     private fun aisSentences(current: BridgeConfig, now: Long): List<String> {
         if (!current.simulated && aisFeed == null) return emptyList()
-        if (!BridgeLogic.shouldEmitAgain(now, lastAisAtMillis, BridgeLogic.AIS_POSITION_INTERVAL_MILLIS)) {
-            return emptyList()
-        }
         val withNames =
             BridgeLogic.shouldEmitAgain(now, lastAisNamesAtMillis, BridgeLogic.AIS_STATIC_INTERVAL_MILLIS)
-        lastAisAtMillis = now
         if (withNames) lastAisNamesAtMillis = now
 
         // Test mode invents its own traffic; otherwise it is whatever the feed still stands
@@ -439,10 +435,9 @@ class GpsBridgeService : Service() {
             if (count > 0) cancelIdleOff() else armIdleOff()
         }
         // A client that just connected would otherwise sit with an empty chart until the
-        // next fix arrives; give it the last known position — and the traffic around it,
-        // which is on a slower cycle and would otherwise take a minute to name itself.
+        // next fix arrives; give it the last known position — and the names with it, which
+        // are on a slower cycle and would otherwise leave the triangles blank for a minute.
         if (count > previous) {
-            lastAisAtMillis = 0L
             lastAisNamesAtMillis = 0L
             emitCurrentFix(heartbeat = true)
         }
