@@ -2,6 +2,14 @@
 <resources>
     <string name="app_name">Oshun GPS Bridge</string>
 
+    <!-- Menú lateral -->
+    <string name="nav_menu_title">Pantallas</string>
+    <string name="nav_open_menu">Abrir menú</string>
+    <string name="nav_bridge">Puente</string>
+    <string name="nav_test_data">Datos de prueba</string>
+    <string name="nav_ais">AIS por internet</string>
+    <string name="nav_version">Versión y descarga</string>
+
     <!-- Main screen -->
     <string name="app_subtitle">Comparte el GPS de este teléfono con Navionics en la tablet, por Wi-Fi.</string>
     <string name="label_port">Puerto</string>
@@ -76,7 +84,7 @@
 
     <!-- Diagnostics / power banners -->
     <string name="idle_banner_title">El puente se había apagado solo</string>
-    <string name="idle_banner_body">No hubo ningún cliente TCP conectado durante 15 minutos y se apagó para ahorrar batería. Si Navionics se te quedó con una posición vieja, fue por esto: podés desactivar el apagado automático más abajo.</string>
+    <string name="idle_banner_body">No hubo ningún cliente TCP conectado durante 15 minutos y se apagó para ahorrar batería. Si Navionics se te quedó con una posición vieja, fue por esto: podés desactivar el apagado automático en esta misma pantalla.</string>
     <string name="idle_banner_dismiss">Entendido</string>
     <string name="battery_banner_title">Optimización de batería activada</string>
     <string name="battery_banner_body">Android puede frenar la app con la pantalla apagada.</string>
@@ -86,6 +94,16 @@
     <string name="sim_title">Modo prueba</string>
     <string name="sim_body">Transmite un barco simulado navegando en el Río de la Plata entre dos puntos separados 12 M, a 4 nudos (3 h por tramo, ida y vuelta). Sirve para probar Navionics de punta a punta sin salir al agua. Lo que sale por la red es idéntico a una navegación real: el aviso está acá, en el registro y en la notificación.</string>
     <string name="switch_sim">Transmitir barco simulado</string>
+    <string name="sim_hint">Se aplica al iniciar la transmisión desde la pantalla Puente.</string>
+    <string name="sim_locked">Detené la transmisión para cambiarlo: la sesión en el aire salió con lo que decía este switch al arrancar.</string>
+    <string name="sim_active_title">Modo prueba activo</string>
+    <string name="sim_active_body">Vas a transmitir un barco simulado: la posición que le llega a Navionics no es la tuya. Apagalo antes de salir al agua.</string>
+    <string name="sim_active_action">Abrir datos de prueba</string>
+    <string name="sim_ais_title">Barcos AIS de prueba</string>
+    <string name="sim_network_title">Red en modo prueba</string>
+    <string name="sim_ais">Además transmite dos barcos AIS de prueba: un carguero a 12 nudos que cruza tu rumbo por el medio del tramo, y una lancha de pesca a 3 nudos cerca del primer waypoint. Sirven para ver si Navionics dibuja los targets. Se llaman TEST y sus MMSI no pertenecen a nadie.</string>
+
+    <!-- AIS por internet -->
     <string name="ais_title">Barcos AIS (internet)</string>
     <string name="ais_body">Muestra en la carta los barcos que un servicio de internet reporta cerca tuyo. Necesita datos: en el canal suele haber señal, mar afuera no. Va por la misma conexión que tu posición, así que anda igual por hotspot o por cable.</string>
     <string name="ais_warning">No sirve para evitar colisiones. Los datos llegan con demora, y sólo aparecen los barcos que transmiten AIS: lanchas, pescadores y todo lo que no transmite no está. Si el feed se corta, la app deja de mandar targets en vez de dejarte fantasmas en la carta.</string>
@@ -101,10 +119,8 @@
     <string name="log_ais_error">Feed AIS rechazado: %1$s</string>
     <!-- %1$s: el mensaje tal como llegó, recortado -->
     <string name="log_ais_sample">Primer mensaje del feed: %1$s</string>
-    <string name="sim_ais">Además transmite dos barcos AIS de prueba: un carguero a 12 nudos que cruza tu rumbo por el medio del tramo, y una lancha de pesca a 3 nudos cerca del primer waypoint. Sirven para ver si Navionics dibuja los targets. Se llaman TEST y sus MMSI no pertenecen a nadie.</string>
 
     <!-- Registro -->
-    <string name="log_open">Ver registro</string>
     <string name="log_title">Registro</string>
     <string name="log_subtitle">Qué cambió y cuándo. El detalle posición por posición va al CSV.</string>
     <!-- %1$s: tamaño, p. ej. "1,2 MB" -->
@@ -132,11 +148,12 @@
 
     <!-- Versión -->
     <string name="version_title">Versión instalada</string>
-    <!-- %1$s: versión, %2$s: commit -->
     <!-- %1$s: versionName, %2$d: versionCode, %3$s: commit -->
     <string name="version_value">v%1$s · build %2$d · %3$s</string>
     <string name="version_hint">Cada build verde publica un APK nuevo en GitHub Releases. El número de build sube en cada uno: si el de Releases es mayor, estás atrasado. Se instala encima sin desinstalar.</string>
-    <string name="version_download">Descargar la última versión</string>
+    <string name="version_download_title">Descargar la última versión</string>
+    <string name="version_download_body">El APK de cada build verde se publica como «app-debug.apk» en la página de Releases.</string>
+    <string name="version_download">Abrir la página de Releases</string>
 
     <!-- Crash screen -->
     <string name="crash_title">La app se cerró de forma inesperada</string>

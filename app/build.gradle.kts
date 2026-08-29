@@ -110,6 +110,8 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    // The handful of icons the side menu draws (menu, home, info, list, play).
+    implementation("androidx.compose.material:material-icons-core")
 
     implementation("com.google.android.gms:play-services-location:21.3.0")
     // The AIS feed is a WebSocket; the platform has no client for one.
