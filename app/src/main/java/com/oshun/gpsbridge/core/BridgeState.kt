@@ -95,7 +95,13 @@ object BridgeState {
         _status.update(transform)
     }
 
+    /**
+     * Back to a stopped bridge — except for the AIS report, which outlives the session on
+     * purpose. It is evidence about the traffic the session saw, and it is read *after*
+     * stopping: wiping it here left the log screen with nothing to hand over exactly when
+     * somebody had gone there to hand it over.
+     */
     fun reset() {
-        _status.value = BridgeStatus()
+        _status.value = BridgeStatus(aisSnapshot = _status.value.aisSnapshot)
     }
 }
