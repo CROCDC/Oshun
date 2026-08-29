@@ -36,6 +36,7 @@ import com.oshun.gpsbridge.location.LocationSource
 import com.oshun.gpsbridge.location.SimulatedFixProvider
 import com.oshun.gpsbridge.model.AisTarget
 import com.oshun.gpsbridge.model.Fix
+import com.oshun.gpsbridge.net.AisStreamMessages
 import com.oshun.gpsbridge.net.NetworkUtils
 import com.oshun.gpsbridge.net.NmeaTcpServer
 import com.oshun.gpsbridge.net.NmeaTransport
@@ -105,6 +106,10 @@ class GpsBridgeService : Service() {
     /** What the feed has told us so far, keyed by MMSI. Written from the feed's own thread. */
     @Volatile
     private var aisTargets: Map<Int, AisTarget> = emptyMap()
+
+    /** Messages the feed delivered, readable or not, and when we last published the count. */
+    private var aisMessages = 0L
+    private var aisCountPublishedAtMillis = 0L
 
     @Volatile
     private var lastClientCount = 0
@@ -214,6 +219,8 @@ class GpsBridgeService : Service() {
                 heartbeatsSent = 0,
                 simulated = newConfig.simulated,
                 aisTargets = 0,
+                aisFeedConnected = false,
+                aisMessages = 0,
                 lastFix = null,
                 lastFixAtMillis = null,
                 lastSendOkAtMillis = null,
@@ -314,12 +321,40 @@ class GpsBridgeService : Service() {
     }
 
     /**
+     * Counts what arrives, and keeps the first message verbatim.
+     *
+     * Three numbers tell three different stories apart, and without them a silent chart is
+     * undiagnosable: no connection is one problem, a connection with no traffic is another,
+     * and traffic we cannot read is a third — and only the last one is ours to fix. So the
+     * first message goes into the log as it came, because the shape of somebody else's JSON
+     * is not something you can guess at from a distance.
+     */
+    @Synchronized
+    private fun onAisMessage(raw: String) {
+        aisMessages += 1
+        val now = System.currentTimeMillis()
+        if (aisMessages == 1L) {
+            EventLog.record(
+                LogEvent(atMillis = now, kind = EventKind.AIS_FEED, detail = RAW_PREFIX + AisStreamMessages.sample(raw)),
+            )
+        }
+        // The count is a diagnostic, not a readout: publishing it per message would recompose
+        // the screen dozens of times a second in a busy channel.
+        if (BridgeLogic.shouldEmitAgain(now, aisCountPublishedAtMillis, AIS_COUNT_INTERVAL_MILLIS)) {
+            aisCountPublishedAtMillis = now
+            BridgeState.update { it.copy(aisMessages = aisMessages) }
+        }
+    }
+
+    /**
      * Opens the internet AIS feed, when the user asked for it and gave it a key. Never in
      * test mode: the simulated traffic is the thing under test there, and mixing real
      * vessels into it would make the chart impossible to read.
      */
     private fun startAisFeed(current: BridgeConfig) {
         aisTargets = emptyMap()
+        aisMessages = 0L
+        aisCountPublishedAtMillis = 0L
         if (!current.aisEnabled || current.simulated) return
         val apiKey = AisKeyStore.load(this)
         if (apiKey.isBlank()) return
@@ -327,6 +362,7 @@ class GpsBridgeService : Service() {
             apiKey = apiKey,
             scope = scope,
             onUpdate = { update -> rememberTarget(update) },
+            onRaw = { raw -> onAisMessage(raw) },
             onConnected = { connected ->
                 // Worth a line of its own: while the feed is down the chart keeps your own
                 // position and quietly stops showing anybody else's.
@@ -338,6 +374,7 @@ class GpsBridgeService : Service() {
                     ),
                 )
                 if (!connected) aisTargets = emptyMap()
+                BridgeState.update { it.copy(aisFeedConnected = connected) }
             },
         ).also { it.start() }
     }
@@ -679,6 +716,12 @@ class GpsBridgeService : Service() {
         const val EXTRA_RAW_LOG = "rawlog"
         const val EXTRA_SIMULATED = "sim"
         const val EXTRA_AIS = "ais"
+
+        /** Marks a log entry that carries a verbatim feed message rather than a state change. */
+        const val RAW_PREFIX = "raw:"
+
+        /** How often the message counter reaches the screen. */
+        private const val AIS_COUNT_INTERVAL_MILLIS = 1_000L
 
         fun start(context: Context, config: BridgeConfig) {
             val intent = Intent(context, GpsBridgeService::class.java).apply {

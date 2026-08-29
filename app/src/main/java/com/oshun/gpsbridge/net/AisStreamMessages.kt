@@ -30,6 +30,17 @@ object AisStreamMessages {
     private const val COURSE_UNAVAILABLE = 360.0
     private const val HEADING_UNAVAILABLE = 511.0
 
+    /**
+     * A message cut down to something a log line can hold.
+     *
+     * This exists for the case that cannot be debugged any other way: the feed connects,
+     * messages arrive, and none of them becomes a vessel. Then the only useful thing in the
+     * world is one real message to read — the shape of somebody else's JSON is not something
+     * you can guess twice.
+     */
+    fun sample(json: String, max: Int = 180): String =
+        json.replace(Regex("\\s+"), " ").trim().take(max)
+
     /** One message from the feed, or null when it says nothing we can use. */
     fun parse(json: String, nowMillis: Long): AisTraffic.Update? = try {
         read(JSONObject(json), nowMillis)

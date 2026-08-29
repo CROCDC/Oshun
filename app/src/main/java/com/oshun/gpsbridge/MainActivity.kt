@@ -602,6 +602,18 @@ private fun StatusCard(status: BridgeStatus, network: NetworkRequirements, nowMi
             if (status.aisTargets > 0) {
                 KeyValue(stringResource(R.string.status_ais), status.aisTargets.toString())
             }
+            // Connection and message count next to the target count: apart, they say whether a
+            // silent chart is a dead feed, empty water, or sentences we are failing to read.
+            if (status.aisFeedConnected || status.aisMessages > 0) {
+                KeyValue(
+                    stringResource(R.string.status_ais_feed),
+                    if (status.aisFeedConnected) {
+                        stringResource(R.string.status_ais_feed_up, status.aisMessages)
+                    } else {
+                        stringResource(R.string.status_ais_feed_down, status.aisMessages)
+                    },
+                )
+            }
             KeyValue(stringResource(R.string.status_port), status.port.toString())
             val protocols = BridgeLogic.enabledProtocols(status)
                 .joinToString(" + ")

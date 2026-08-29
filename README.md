@@ -201,6 +201,20 @@ no hay ninguno, y el triángulo no dice nada de su edad. Entonces:
 - Sólo salen los que están **a menos de 12 M**, los más cercanos primero, hasta 40.
 - **Si el feed se corta**, la app lo anota en el registro y deja de mandar targets, en vez de
   dejarte fantasmas en la carta.
+
+### Cómo saber por qué no aparecen barcos
+
+La tarjeta de estado separa tres cosas que se ven igual desde la carta:
+
+| Lo que ves | Qué significa |
+|---|---|
+| No aparece la fila **Feed AIS** | El feed no está prendido, o falta la API key |
+| `Feed AIS: caído` | Problema de conexión o de key |
+| `conectado · 0 mensajes` | Conecta, pero no llega nada: **no hay cobertura en la zona** |
+| `conectado · N mensajes` con `Targets AIS: 0` | Llegan datos y no los sabemos leer, o están todos lejos/viejos |
+
+En el último caso el registro guarda **el primer mensaje del feed tal como llegó**, recortado.
+Ése es el dato que permite corregir el parser contra la realidad.
 - Las señales de "no disponible" del estándar (102,3 nudos, rumbo 360, heading 511) y la
   posición 0,0 se descartan en vez de dibujarse.
 

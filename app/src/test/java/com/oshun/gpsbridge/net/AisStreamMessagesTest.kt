@@ -2,6 +2,7 @@ package com.oshun.gpsbridge.net
 
 import com.oshun.gpsbridge.core.AisTraffic
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -135,5 +136,20 @@ class AisStreamMessagesTest {
         assertNull(AisStreamMessages.parse("""{"Message":{"PositionReport":{"UserID":0}}}""", now))
         // A message with an identity but nothing else to say is not a vessel.
         assertNull(AisStreamMessages.parse("""{"MetaData":{"MMSI":701000123}}""", now))
+    }
+
+    @Test
+    fun keepsOneMessageReadableForTheLog() {
+        // The case this serves: the feed connects, messages arrive, nothing reaches the chart.
+        // Then one real message is the only thing that says whether the parser is wrong.
+        val sample = AisStreamMessages.sample(positionReport, max = 60)
+        assertTrue(sample, sample.startsWith("{ \"MessageType\": \"PositionReport\""))
+        assertEquals(60, sample.length)
+        assertFalse("no newlines: a log line is one line", sample.contains("\n"))
+    }
+
+    @Test
+    fun aShortMessageSurvivesWhole() {
+        assertEquals("{}", AisStreamMessages.sample("  {}\n ", max = 60))
     }
 }

@@ -31,6 +31,7 @@ class AisStreamFeed(
     private val scope: CoroutineScope,
     private val onUpdate: (AisTraffic.Update) -> Unit,
     private val onConnected: (Boolean) -> Unit,
+    private val onRaw: (String) -> Unit = {},
 ) {
 
     private val client = OkHttpClient.Builder()
@@ -105,6 +106,9 @@ class AisStreamFeed(
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
+            // Raw first, parsed second: a message we cannot read still proves the feed is alive,
+            // which is the difference between "no coverage" and "our parser is wrong".
+            onRaw(text)
             AisStreamMessages.parse(text, System.currentTimeMillis())?.let(onUpdate)
         }
 

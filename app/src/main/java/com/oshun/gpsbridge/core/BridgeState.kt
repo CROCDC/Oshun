@@ -55,6 +55,13 @@ data class BridgeStatus(
     val simulated: Boolean = false,
     /** How many other vessels are going out on the stream as AIS targets. */
     val aisTargets: Int = 0,
+    /** Whether the internet AIS feed is connected right now. */
+    val aisFeedConnected: Boolean = false,
+    /**
+     * Messages received from the feed. Together with [aisTargets] this tells three different
+     * stories apart: no connection, connection without traffic, and traffic we fail to read.
+     */
+    val aisMessages: Long = 0,
     /** Sentences emitted as heartbeat (a resend of the last fix), included in [sentencesSent]. */
     val heartbeatsSent: Long = 0,
     val batteryPercent: Int? = null,
