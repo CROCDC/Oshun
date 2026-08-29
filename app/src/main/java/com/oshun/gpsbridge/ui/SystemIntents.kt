@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
 import com.oshun.gpsbridge.BuildConfig
+import com.oshun.gpsbridge.release.LatestApk
 
 /**
  * The handful of places the app sends the user out to the system, each with the fallback it
@@ -67,11 +68,25 @@ internal fun openBatteryOptimizationSettings(context: Context) {
 }
 
 /** Opens the Releases page, where every green build publishes a fresh APK. */
-internal fun openReleases(context: Context) {
+internal fun openReleases(context: Context) = open(context, BuildConfig.RELEASES_URL)
+
+/**
+ * Sends the browser straight at the APK, so the download is the tap instead of the page you
+ * then have to find the file on.
+ *
+ * Falls back to that page whenever the address cannot be worked out — no network, GitHub
+ * rate-limiting us, a release with no APK in it. Landing you one tap away beats a button
+ * that does nothing.
+ */
+internal suspend fun openLatestApk(context: Context) {
+    val apk = LatestApk.url()
+    if (apk == null) openReleases(context) else open(context, apk)
+}
+
+private fun open(context: Context, url: String) {
     try {
         context.startActivity(
-            Intent(Intent.ACTION_VIEW, Uri.parse(BuildConfig.RELEASES_URL))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     } catch (e: Exception) {
         // No browser to handle it: nothing useful to do, and never worth crashing over.

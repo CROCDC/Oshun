@@ -11,6 +11,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -19,17 +24,22 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.oshun.gpsbridge.BuildConfig
 import com.oshun.gpsbridge.R
+import kotlinx.coroutines.launch
 
 /**
  * Which build is on the phone, and where a newer one comes from.
  *
  * The app is sideloaded, so nothing tells you a newer build exists — and the version name
- * does not move between debug builds. The commit does, so it is what gets shown, next to
- * the page where every green build publishes a fresh APK.
+ * does not move between debug builds. The commit does, so it is what gets shown, next to the
+ * button that downloads the newest one.
  */
 @Composable
 fun VersionScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // The APK's address has to be asked for before the browser can be sent at it, and that is
+    // a network call: without this the button would look broken for as long as it takes.
+    var looking by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -62,11 +72,24 @@ fun VersionScreen(modifier: Modifier = Modifier) {
                 fontFamily = FontFamily.Monospace,
             )
             OutlinedButton(
-                onClick = { openReleases(context) },
+                enabled = !looking,
+                onClick = {
+                    looking = true
+                    scope.launch {
+                        openLatestApk(context)
+                        looking = false
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("download_update"),
-            ) { Text(stringResource(R.string.version_download)) }
+            ) {
+                Text(
+                    stringResource(
+                        if (looking) R.string.version_download_looking else R.string.version_download,
+                    ),
+                )
+            }
         }
     }
 }

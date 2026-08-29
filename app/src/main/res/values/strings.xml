@@ -152,8 +152,9 @@
     <string name="version_value">v%1$s · build %2$d · %3$s</string>
     <string name="version_hint">Cada build verde publica un APK nuevo en GitHub Releases. El número de build sube en cada uno: si el de Releases es mayor, estás atrasado. Se instala encima sin desinstalar.</string>
     <string name="version_download_title">Descargar la última versión</string>
-    <string name="version_download_body">El APK de cada build verde se publica como «app-debug.apk» en la página de Releases.</string>
-    <string name="version_download">Abrir la página de Releases</string>
+    <string name="version_download_body">El botón baja el APK directo, sin pasar por la página. Cada build se publica con su propio nombre («oshun-74.apk», por el número de build), así no se te apilan descargas repetidas y sabés cuál bajaste. Chrome igual va a preguntarte si querés conservar el archivo: es lo que hace con cualquier APK.</string>
+    <string name="version_download">Descargar el último APK</string>
+    <string name="version_download_looking">Buscando el último APK…</string>
 
     <!-- Crash screen -->
     <string name="crash_title">La app se cerró de forma inesperada</string>
