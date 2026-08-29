@@ -163,7 +163,9 @@ AIS-catcher ya sabe mandar NMEA por UDP a apps de plotteo. Nosotros lo recibirí
 **localhost**, lo mezclaríamos con nuestro `$GPRMC` y saldría **todo por un solo socket** — que
 es justamente lo que Navionics necesita, porque empareja **un** dispositivo.
 
-Eso implica una feature concreta y chica: **entrada NMEA externa por UDP**. Y es la misma pieza
+Eso implica una feature concreta y chica: **entrada NMEA externa por UDP** — el plan para
+hacerlo con código propio, sin depender de AIS-catcher, está en
+[`plan-ais-propio.md`](plan-ais-propio.md). Y es la misma pieza
 que haría falta para el feed crudo de VesselFinder (§1), así que construir una deja la otra
 casi hecha.
 
