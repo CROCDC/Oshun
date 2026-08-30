@@ -68,7 +68,7 @@ internal fun openBatteryOptimizationSettings(context: Context) {
 }
 
 /** Opens the Releases page, where every green build publishes a fresh APK. */
-internal fun openReleases(context: Context) = open(context, BuildConfig.RELEASES_URL)
+internal fun openReleases(context: Context) = openUrl(context, BuildConfig.RELEASES_URL)
 
 /**
  * Sends the browser straight at the APK, so the download is the tap instead of the page you
@@ -79,11 +79,12 @@ internal fun openReleases(context: Context) = open(context, BuildConfig.RELEASES
  * that does nothing.
  */
 internal suspend fun openLatestApk(context: Context) {
-    val apk = LatestApk.url()
-    if (apk == null) openReleases(context) else open(context, apk)
+    val apk = LatestApk.latest()
+    if (apk == null) openReleases(context) else openUrl(context, apk.url)
 }
 
-private fun open(context: Context, url: String) {
+/** Hands an address to whatever browser the phone has, if it has one. */
+internal fun openUrl(context: Context, url: String) {
     try {
         context.startActivity(
             Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),

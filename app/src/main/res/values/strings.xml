@@ -153,8 +153,13 @@
     <string name="version_title">Versión instalada</string>
     <!-- %1$s: versionName, %2$d: versionCode, %3$s: commit -->
     <string name="version_value">v%1$s · build %2$d · %3$s</string>
-    <string name="version_hint">Cada build verde publica un APK nuevo en GitHub Releases. El número de build sube en cada uno: si el de Releases es mayor, estás atrasado. Se instala encima sin desinstalar.</string>
-    <string name="version_download_title">Descargar la última versión</string>
+    <string name="version_hint">Cada build verde publica un APK nuevo en GitHub Releases, y la app sola compara ese número con el que tenés instalado. Se instala encima sin desinstalar.</string>
+    <string name="version_download_title">Actualizaciones</string>
+    <string name="version_checking">Fijándose si hay una versión más nueva…</string>
+    <string name="version_up_to_date">Estás en la última versión publicada: no hay nada para descargar.</string>
+    <!-- %1$d: número de build publicado -->
+    <string name="version_update_available">Hay una versión más nueva: build %1$d.</string>
+    <string name="version_check_failed">No se pudo averiguar si hay una versión más nueva (sin internet, o GitHub no contestó). El botón igual intenta bajar el último APK.</string>
     <string name="version_download_body">El botón baja el APK directo, sin pasar por la página. Cada build se publica con su propio nombre («oshun-74.apk», por el número de build), así no se te apilan descargas repetidas y sabés cuál bajaste. Chrome igual va a preguntarte si querés conservar el archivo: es lo que hace con cualquier APK.</string>
     <string name="version_download">Descargar el último APK</string>
     <string name="version_download_looking">Buscando el último APK…</string>
