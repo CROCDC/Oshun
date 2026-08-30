@@ -1,6 +1,7 @@
 package com.oshun.gpsbridge.release
 
 import com.oshun.gpsbridge.BuildConfig
+import com.oshun.gpsbridge.net.Apk
 import com.oshun.gpsbridge.net.ReleaseAssets
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -29,8 +30,17 @@ object LatestApk {
     /** Overridable so a test can point it at a server it runs itself, as the AIS feed does. */
     var apiUrl: String = BuildConfig.RELEASE_API_URL
 
-    /** The APK's download address, or null when it cannot be worked out. */
-    suspend fun url(): String? = withContext(Dispatchers.IO) {
+    /**
+     * The whole lookup, overridable so a screen test can stand in for GitHub's answer. What
+     * the version screen does with that answer is the part worth testing, and going to the
+     * real GitHub to find it out would make that a test of the network.
+     */
+    var lookup: suspend () -> Apk? = { fetch() }
+
+    /** The newest published APK, or null when it cannot be worked out. */
+    suspend fun latest(): Apk? = lookup()
+
+    private suspend fun fetch(): Apk? = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder()
                 .url(apiUrl)
@@ -38,7 +48,7 @@ object LatestApk {
                 .build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@use null
-                ReleaseAssets.apkUrl(response.body?.string().orEmpty())
+                ReleaseAssets.apk(response.body?.string().orEmpty())
             }
         } catch (e: Exception) {
             null // no network, no DNS, GitHub rate-limiting us: all the same answer here

@@ -1,5 +1,6 @@
 package com.oshun.gpsbridge.release
 
+import com.oshun.gpsbridge.net.Apk
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -42,13 +43,13 @@ class LatestApkTest {
                    "updated_at":"2026-08-29T12:10:00Z"}]}""",
             ),
         )
-        assertEquals("https://example.test/oshun-74.apk", runBlocking { LatestApk.url() })
+        assertEquals(Apk("https://example.test/oshun-74.apk", 74), runBlocking { LatestApk.latest() })
     }
 
     @Test
     fun asksForTheReleaseWeMean() {
         server.enqueue(MockResponse().setBody("""{"assets":[]}"""))
-        runBlocking { LatestApk.url() }
+        runBlocking { LatestApk.latest() }
         val request = server.takeRequest()
         assertEquals("/releases/tags/debug-latest", request.path)
         assertEquals("application/vnd.github+json", request.getHeader("Accept"))
@@ -59,12 +60,12 @@ class LatestApkTest {
         // Rate limiting is the one that will actually happen: GitHub allows sixty unauthenticated
         // calls an hour, and the caller needs a null to fall back on, not an exception.
         server.enqueue(MockResponse().setResponseCode(403).setBody("""{"message":"API rate limit exceeded"}"""))
-        assertNull(runBlocking { LatestApk.url() })
+        assertNull(runBlocking { LatestApk.latest() })
     }
 
     @Test
     fun aServerThatIsNotThereIsAnAnswerToo() {
         server.shutdown()
-        assertNull(runBlocking { LatestApk.url() })
+        assertNull(runBlocking { LatestApk.latest() })
     }
 }

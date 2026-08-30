@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -13,12 +14,14 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
+import com.oshun.gpsbridge.net.Apk
 import com.oshun.gpsbridge.net.Link
 import com.oshun.gpsbridge.net.LinkAddress
 import com.oshun.gpsbridge.net.NetworkRequirements
 import com.oshun.gpsbridge.core.BridgeConfig
 import com.oshun.gpsbridge.location.FixProvider
 import com.oshun.gpsbridge.model.Fix
+import com.oshun.gpsbridge.release.LatestApk
 import com.oshun.gpsbridge.service.GpsBridgeService
 import com.oshun.gpsbridge.store.ConfigStore
 import kotlinx.coroutines.delay
@@ -214,9 +217,51 @@ class MainActivityTest {
     @Test
     fun showsTheInstalledBuildAndAWayToUpdate() {
         // Sideloaded: nothing else tells you whether the phone has the newest build.
-        navigateTo("nav_version")
-        compose.onNodeWithText(str(R.string.version_title)).assertExists()
-        compose.onNodeWithTag("download_update").assertExists()
+        withPublishedBuild(BuildConfig.VERSION_CODE + 1) {
+            navigateTo("nav_version")
+            compose.onNodeWithText(str(R.string.version_title)).assertExists()
+            compose.waitUntil(timeoutMillis = 5_000) {
+                compose.onAllNodesWithTag("download_update").fetchSemanticsNodes().isNotEmpty()
+            }
+        }
+    }
+
+    @Test
+    fun onTheNewestBuildThereIsNothingToDownload() {
+        // A download that would install the build you already have is a button that lies
+        // about there being something to do.
+        withPublishedBuild(BuildConfig.VERSION_CODE) {
+            navigateTo("nav_version")
+            compose.waitUntil(timeoutMillis = 5_000) {
+                compose.onAllNodesWithText(str(R.string.version_up_to_date)).fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithTag("download_update").assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun whenGitHubCannotBeAskedTheDownloadStays() {
+        // Not knowing is not the same as being up to date, and a phone with no signal must
+        // not be left without the one way it has to update.
+        withPublishedBuild(null) {
+            navigateTo("nav_version")
+            compose.waitUntil(timeoutMillis = 5_000) {
+                compose.onAllNodesWithTag("download_update").fetchSemanticsNodes().isNotEmpty()
+            }
+        }
+    }
+
+    /** Runs [body] with GitHub standing still: a published build, or no answer at all. */
+    private fun withPublishedBuild(build: Int?, body: () -> Unit) {
+        val real = LatestApk.lookup
+        LatestApk.lookup = {
+            build?.let { Apk("https://example.test/oshun-$it.apk", it) }
+        }
+        try {
+            body()
+        } finally {
+            LatestApk.lookup = real
+        }
     }
 
     @Test

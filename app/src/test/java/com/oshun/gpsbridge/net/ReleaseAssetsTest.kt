@@ -21,7 +21,7 @@ class ReleaseAssetsTest {
     @Test
     fun findsTheApk() {
         val json = release(asset("oshun-74.apk", "https://example.test/oshun-74.apk", "2026-08-29T11:46:22Z"))
-        assertEquals("https://example.test/oshun-74.apk", ReleaseAssets.apkUrl(json))
+        assertEquals(Apk("https://example.test/oshun-74.apk", 74), ReleaseAssets.apk(json))
     }
 
     @Test
@@ -32,7 +32,7 @@ class ReleaseAssetsTest {
             asset("oshun-73.apk", "https://example.test/oshun-73.apk", "2026-08-29T11:46:22Z"),
             asset("oshun-74.apk", "https://example.test/oshun-74.apk", "2026-08-29T12:10:00Z"),
         )
-        assertEquals("https://example.test/oshun-74.apk", ReleaseAssets.apkUrl(json))
+        assertEquals(Apk("https://example.test/oshun-74.apk", 74), ReleaseAssets.apk(json))
     }
 
     @Test
@@ -41,17 +41,26 @@ class ReleaseAssetsTest {
             asset("coverage.zip", "https://example.test/coverage.zip", "2026-08-29T12:10:00Z"),
             asset("oshun-74.apk", "https://example.test/oshun-74.apk", "2026-08-29T11:46:22Z"),
         )
-        assertEquals("https://example.test/oshun-74.apk", ReleaseAssets.apkUrl(json))
+        assertEquals(Apk("https://example.test/oshun-74.apk", 74), ReleaseAssets.apk(json))
+    }
+
+    @Test
+    fun readsTheBuildOutOfTheNameAndSaysSoWhenItCannot() {
+        // The build number only exists in the file name, and the screen compares it against
+        // the installed one. A release published under some other name must not read as a
+        // build number that isn't there.
+        val named = release(asset("app-debug.apk", "https://example.test/app-debug.apk", "2026-08-29T11:46:22Z"))
+        assertEquals(Apk("https://example.test/app-debug.apk", null), ReleaseAssets.apk(named))
     }
 
     @Test
     fun saysNothingRatherThanThrowing() {
-        assertNull(ReleaseAssets.apkUrl(""))
-        assertNull(ReleaseAssets.apkUrl("not json at all"))
-        assertNull(ReleaseAssets.apkUrl("""{"message":"Not Found"}"""))
-        assertNull(ReleaseAssets.apkUrl(release()))
-        assertNull(ReleaseAssets.apkUrl(release(asset("notes.txt", "https://example.test/notes.txt", "2026-08-29T11:46:22Z"))))
+        assertNull(ReleaseAssets.apk(""))
+        assertNull(ReleaseAssets.apk("not json at all"))
+        assertNull(ReleaseAssets.apk("""{"message":"Not Found"}"""))
+        assertNull(ReleaseAssets.apk(release()))
+        assertNull(ReleaseAssets.apk(release(asset("notes.txt", "https://example.test/notes.txt", "2026-08-29T11:46:22Z"))))
         // An asset with no address is not an address.
-        assertNull(ReleaseAssets.apkUrl(release("""{"name":"oshun-74.apk","updated_at":"2026-08-29T11:46:22Z"}""")))
+        assertNull(ReleaseAssets.apk(release("""{"name":"oshun-74.apk","updated_at":"2026-08-29T11:46:22Z"}""")))
     }
 }
