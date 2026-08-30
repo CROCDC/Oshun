@@ -147,6 +147,13 @@ La app puede emitir por los dos a la vez; después probás cuál te funciona mej
 4. Ingresá **Host = IP del teléfono**, **Port = 2000**, **Protocol = TCP** (o UDP) y guardá.
 5. La posición del teléfono aparece y se mueve en la carta.
 
+### Lo que Navionics lee, y lo que no
+
+Del dispositivo emparejado toma **posición, profundidad y AIS**. **Viento no**: una `MWV` por
+este socket no se muestra en ningún lado, así que el puente no la emite. El viento que ves en
+la app es el pronóstico que baja de internet, no un dato del barco. El detalle y cómo
+verificarlo está en [`docs/navionics-viento.md`](docs/navionics-viento.md).
+
 ## Modo prueba: barco simulado en el Río de la Plata
 
 Para probar la integración completa con Navionics **sin salir al agua**. Con el switch
